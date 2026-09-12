@@ -1,3 +1,4 @@
+package hashmap
 
 type entry struct {
     key   string
@@ -12,3 +13,4 @@ type Hashmap struct {
     nb_entries uint64
     elements []bucket
 }
+ 
