@@ -29,8 +29,8 @@ install-go:
 	@echo "Run 'source ~/.profile' or restart your terminal to update your current PATH."
 
 test:
-	go build && echo "All good!"
-	go test && echo "All good!"
+	@go build && echo "All good!"
+	@go test ./... && echo "All good!"
 
 clean:
 	go clean
