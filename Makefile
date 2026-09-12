@@ -8,8 +8,6 @@ GO_VERSION := 1.27.1
 all: client server
 
 run: server client
-	./server
-
 
 server:
 #	go build server
@@ -35,5 +33,6 @@ test:
 	go test && echo "All good!"
 
 clean:
+	go clean
 
 re: clean all
