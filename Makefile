@@ -8,8 +8,6 @@ GO_VERSION := 1.27.1
 all: client server
 
 run: server client
-	./server
-
 
 server:
 #	go build server
@@ -31,9 +29,10 @@ install-go:
 	@echo "Run 'source ~/.profile' or restart your terminal to update your current PATH."
 
 test:
-	go build && echo "All good!"
-	go test && echo "All good!"
+	@go build && echo "All good!"
+	@go test ./... && echo "All good!"
 
 clean:
+	go clean
 
 re: clean all
