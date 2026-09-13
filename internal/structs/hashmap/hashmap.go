@@ -1,17 +1,15 @@
 package hashmap
 
-import "errors"
-
 type entry struct {
 	key   string
-	value uint64
+	value any
 }
 
 type bucket struct {
 	entries []entry
 }
 
-func (bucket *bucket) append(key string, value uint64) {
+func (bucket *bucket) append(key string, value any) {
 	bucket.entries = append(bucket.entries, entry{key, value})
 }
 
@@ -43,7 +41,7 @@ func (hashmap *Hashmap) resize() {
     hashmap.elements = new_elements
 }
 
-func (hashmap *Hashmap) Insert(key string, value uint64) {
+func (hashmap *Hashmap) Insert(key string, value any) {
     
 	inserted := hashmap.nb_inserted + 1
 	max_entries_before_resize := uint64(float32(hashmap.cap()) * filled_factor_before_resize)
@@ -61,12 +59,12 @@ func (hashmap *Hashmap) Insert(key string, value uint64) {
 	hashmap.elements[index].append(key, value)
 }
 
-func (hashmap *Hashmap) Get(key string) (uint64, error) {
+func (hashmap *Hashmap) Get(key string) (any, error) {
 	index := hash(key, hashmap.cap())
 	for _, entry := range hashmap.elements[index].entries {
 		if entry.key == key {
 			return entry.value, nil
 		}
 	}
-	return 0, errors.New("key not found")
+	return nil, key_not_found
 }
