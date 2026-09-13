@@ -32,13 +32,16 @@ func TestHash(t *testing.T) {
             h2 := hash(test, size)
 
             if h1 != h2 {
-                t.Errorf("hash(%q, %d) is not deterministic", test, size)
+                t.Fatalf("hash(%q, %d) is not deterministic", test, size)
             }
 
             if h1 >= size {
-                t.Errorf("hash(%q, %d) = %d, want < %d",
+                t.Fatalf("hash(%q, %d) = %d, want < %d",
                     test, size, h1, size)
             }
         }
+    }
+    if hash("hello", 10) == hash("yolo", 10) {
+        t.Fatalf("hash('hello', 10) == hash('yolo', 10)")
     }
 }
