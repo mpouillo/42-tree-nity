@@ -47,6 +47,27 @@ func TestInsert(t *testing.T) {
 	if !found {
 		t.Errorf("key 'world' with value 100 not found in bucket %d", idx)
 	}
+
+	// Override existing key "hello" with a new value
+	hm.Insert("hello", 84)
+
+	idx = hash("hello", hm.cap())
+	found = false
+	count := 0
+	for _, entry := range hm.elements[idx].entries {
+		if entry.key == "hello" {
+			count++
+			if entry.value == 84 {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Errorf("key 'hello' with overridden value 84 not found in bucket %d", idx)
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 entry for key 'hello', got %d", count)
+	}
 }
 
 func TestResize(t *testing.T) {
