@@ -1,5 +1,7 @@
 package hashmap
 
+import "errors"
+
 type entry struct {
 	key   string
 	value uint64
@@ -57,4 +59,14 @@ func (hashmap *Hashmap) Insert(key string, value uint64) {
     }
 	hashmap.nb_inserted++
 	hashmap.elements[index].append(key, value)
+}
+
+func (hashmap *Hashmap) Get(key string) (uint64, error) {
+	index := hash(key, hashmap.cap())
+	for _, entry := range hashmap.elements[index].entries {
+		if entry.key == key {
+			return entry.value, nil
+		}
+	}
+	return 0, errors.New("key not found")
 }
