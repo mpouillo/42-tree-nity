@@ -40,14 +40,21 @@ func (hashmap *Hashmap) resize() {
 	}
     hashmap.elements = new_elements
 }
-func (hashmap *Hashmap) Insert(key string, value uint64) {
-	hashmap.nb_inserted++
 
-	inserted := hashmap.nb_inserted
+func (hashmap *Hashmap) Insert(key string, value uint64) {
+    
+	inserted := hashmap.nb_inserted + 1
 	max_entries_before_resize := uint64(float32(hashmap.cap()) * filled_factor_before_resize)
 	if inserted >= max_entries_before_resize {
 		hashmap.resize()
-	}
+    }
 	var index uint64 = hash(key, hashmap.cap())
+    for i := range hashmap.elements[index].entries {
+		if hashmap.elements[index].entries[i].key == key {
+			hashmap.elements[index].entries[i].value = value
+            return
+        }
+    }
+	hashmap.nb_inserted++
 	hashmap.elements[index].append(key, value)
 }
