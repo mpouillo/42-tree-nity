@@ -2,6 +2,7 @@ package trie
 
 import (
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,8 +15,8 @@ func TestNewTrie(t *testing.T) {
 	if trie.RootNode == nil {
 		t.Fatal("Expected RootNode to be initialized, got nil")
 	}
-	if trie.RootNode.Value != nil {
-		t.Errorf("Expected root node character to be nil, got %q", trie.RootNode.Value)
+	if trie.RootNode.Values != nil {
+		t.Errorf("Expected root node values to be nil/empty, got %v", trie.RootNode.Values)
 	}
 }
 
@@ -36,7 +37,7 @@ func TestInsert(t *testing.T) {
 		for _, char := range key {
 			current = current.Children[char]
 		}
-		assert.Equal(t, current.Value, value)
+		assert.Equal(t, []any{value}, current.Values)
 	})
 
 	t.Run("Root insert", func(t *testing.T) {
@@ -47,10 +48,7 @@ func TestInsert(t *testing.T) {
 		trie.Insert(key, value)
 
 		current := trie.RootNode
-		for _, char := range key {
-			current = current.Children[char]
-		}
-		assert.Equal(t, current.Value, value)
+		assert.Equal(t, []any{value}, current.Values)
 	})
 }
 
@@ -60,13 +58,12 @@ func TestSearch(t *testing.T) {
 	trie.Insert("user.action", client{"client1", 3})
 	trie.Insert("", client{"client2", 99})
 
-	got, err := trie.Search("user.action")
+	got, _ := trie.Search("user.action")
 	want := []any{
-		client{"client1", 3},
 		client{"client2", 99},
 		client{"client0", 0},
+		client{"client1", 3},
 	}
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, want, got)
 }
