@@ -1,6 +1,7 @@
 package trie
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -156,4 +157,67 @@ func TestSearchPrefix(t *testing.T) {
 
 		})
 	}
+}
+
+func TestFindMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "Search full match",
+			input:    "boogie-woogie",
+			expected: []string{"boogie-woogie"},
+		},
+		{
+			name:     "Search partial match",
+			input:    "boogie",
+			expected: []string{"boogie-woogie", "boogiepop"},
+		},
+		{
+			name:     "Search invalid match",
+			input:    "rocketship",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			trie := NewTrie()
+			for _, word := range []string{"boogie-woogie", "boogiepop", "boolean", "woogie"} {
+				err := trie.Insert(word)
+
+				if err != nil {
+					t.Fatalf("Unexpected error during Insert(\"%v\"): %v", word, err)
+				}
+			}
+
+			got, err := trie.FindMatches(tt.input)
+			want := tt.expected
+
+			if err != nil {
+				t.Fatalf("Unexpected error during Search(%q): %v", tt.input, err)
+			}
+
+			if !hasSameElements(got, want) {
+				t.Errorf("got %v want %v", got, want)
+			}
+
+		})
+	}
+}
+
+func hasSameElements(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	aCopy := slices.Clone(a)
+	bCopy := slices.Clone(b)
+
+	slices.Sort(aCopy)
+	slices.Sort(bCopy)
+
+	return slices.Equal(aCopy, bCopy)
 }
