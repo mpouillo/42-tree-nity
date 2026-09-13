@@ -1,13 +1,13 @@
 package trie
 
 type Node struct {
-	Value    any
+	Values    []any
 	Children map[rune]*Node
 }
 
-func NewNode(value any) *Node {
+func NewNode() *Node {
 	return &Node{
-		Value:    value,
+		Values:    nil,
 		Children: make(map[rune]*Node),
 	}
 }
@@ -17,38 +17,37 @@ type Trie struct {
 }
 
 func NewTrie() *Trie {
-	root := NewNode(nil)
-	return &Trie{RootNode: root}
+	return &Trie{RootNode: NewNode()}
 }
 
 func (t *Trie) Insert(key string, value any) {
 	current := t.RootNode
 	for _, char := range key {
 		if _, exists := current.Children[char]; !exists {
-			current.Children[char] = NewNode(nil)
+			current.Children[char] = NewNode()
 		}
 		current = current.Children[char]
 	}
-	current.Value = value
+	current.Values = append(current.Values, value)
 }
 
 func (t *Trie) Search(key string) ([]any, error) {
     current := t.RootNode
     var matches []any
 
-    if current.Value != nil {
-        matches = append(matches, current.Value)
+    if len(current.Values) > 0 {
+        matches = append(matches, current.Values...)
     }
 
     for _, char := range key {
         next, exists := current.Children[char]
         if !exists {
-            return matches, nil
+            break
         }
         current = next
 
-        if current.Value != nil {
-            matches = append(matches, current.Value)
+        if len(current.Values) > 0 {
+            matches = append(matches, current.Values...)
         }
     }
 
