@@ -100,6 +100,23 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("expected nil Fifo, got %v", f)
 		}
 	})
+
+	t.Run("create on existing fifo is not owner", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		if _, err := createFifo(path); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		defer f.Close()
+
+		if f.owner {
+			t.Fatalf("expected owner = false when the fifo already existed")
+		}
+	})
 }
 
 func TestOpen(t *testing.T) {
@@ -127,6 +144,41 @@ func TestOpen(t *testing.T) {
 		_, err := Open(path, os.O_RDONLY)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
+		}
+	})
+
+	t.Run("open symlink to fifo is rejected", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "target.fifo")
+		_, err := createFifo(target)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		link := filepath.Join(dir, "link.fifo")
+		err = os.Symlink(target, link)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		f, err := Open(link, os.O_RDWR)
+		if err == nil {
+			f.Close()
+			t.Fatalf("expected error for symlink, got nil")
+		}
+	})
+
+	t.Run("open regular file is rejected", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "regular")
+		err := os.WriteFile(path, []byte("not a fifo"), 0600)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		f, err := Open(path, os.O_RDWR)
+		if err == nil {
+			f.Close()
+			t.Fatalf("expected error for regular file, got nil")
 		}
 	})
 }
