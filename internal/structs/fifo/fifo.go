@@ -78,6 +78,7 @@ func Create(path string, flag int) (*Fifo, error) {
 
 func (f *Fifo) Read(p []byte) (int, error)  { return f.file.Read(p) }
 func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
+func (f *Fifo) Path() string                { return f.path }
 
 // Closes the Fifo and deletes the file if we are owner of it
 func (f *Fifo) Close() error {
