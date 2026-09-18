@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+func TestPath(t *testing.T) {
+	path := "/tmp/test.fifo"
+	f := &Fifo{path: path}
+
+	if f.Path() != path {
+		t.Fatalf("expected path %q, got %q", path, f.Path())
+	}
+}
+
 func TestCreateFifo(t *testing.T) {
 	t.Run("check fifo created", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
