@@ -60,6 +60,7 @@ func Open(path string, flags int) (*Fifo, error) {
 }
 
 // Create creates a named FIFO at the specified path and opens it with the specified flags.
+// If the FIFO already existed, it is reused and will not be removed on Close.
 func Create(path string, flag int) (*Fifo, error) {
 	WeCreated, err := createFifo(path)
 	if err != nil {
