@@ -61,18 +61,18 @@ func Open(path string, flags int) (*Fifo, error) {
 
 // Create creates a named FIFO at the specified path and opens it with the specified flags.
 func Create(path string, flag int) (*Fifo, error) {
-	we_created, err := createFifo(path)
+	WeCreated, err := createFifo(path)
 	if err != nil {
 		return nil, err
 	}
 	fifo, err := Open(path, flag)
 	if err != nil {
-		if we_created {
+		if WeCreated {
 			os.Remove(path)
 		}
 		return nil, err
 	}
-	fifo.owner = we_created
+	fifo.owner = WeCreated
 	return fifo, nil
 }
 
