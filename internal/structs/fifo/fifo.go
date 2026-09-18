@@ -1,19 +1,19 @@
 package fifo
 
 import (
-    "os"
-    "sync"
-    "fmt"
-    "syscall"
-    "errors"
-	)
+	"errors"
+	"fmt"
+	"os"
+	"sync"
+	"syscall"
+)
 
 type Fifo struct {
-    path  string
-    file  *os.File
-    owner bool      // true = we create the fifo and must remove it
-    closeOnce  sync.Once // avoid closing multiple times
-    closeErr	error
+	path      string
+	file      *os.File
+	owner     bool      // true = we create the fifo and must remove it
+	closeOnce sync.Once // avoid closing multiple times
+	closeErr  error
 }
 
 // Create a named FIFO at the specified path.
@@ -32,7 +32,7 @@ func createFifo(path string) (created bool, err error) {
 	if statErr != nil {
 		return false, statErr
 	}
-	if fi.Mode() & os.ModeNamedPipe == 0 {
+	if fi.Mode()&os.ModeNamedPipe == 0 {
 		return false, fmt.Errorf("fifo: %s exists but it is not a FIFO (%s)", path, fi.Mode())
 	}
 	return false, nil
@@ -67,7 +67,7 @@ func Create(path string, flag int) (*Fifo, error) {
 	}
 	fifo, err := Open(path, flag)
 	if err != nil {
-		if we_created{
+		if we_created {
 			os.Remove(path)
 		}
 		return nil, err
@@ -87,7 +87,7 @@ func (fifo *Fifo) Close() error {
 		}
 
 		if fifo.owner {
-			err := os.Remove(fifo.path) 
+			err := os.Remove(fifo.path)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				if fifo.closeErr == nil {
 					fifo.closeErr = err
