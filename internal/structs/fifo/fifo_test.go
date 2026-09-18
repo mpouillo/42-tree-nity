@@ -1,6 +1,7 @@
 package fifo
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -126,6 +127,173 @@ func TestOpen(t *testing.T) {
 		_, err := Open(path, os.O_RDONLY)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
+		}
+	})
+}
+
+func TestRead(t *testing.T) {
+	t.Run("read data written to fifo", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+		defer f.file.Close()
+
+		want := []byte("hello")
+		_, err = f.Write(want)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		got := make([]byte, len(want))
+		n, err := f.Read(got)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if n != len(want) {
+			t.Fatalf("expected to read %d bytes, got %d", len(want), n)
+		}
+		if string(got) != string(want) {
+			t.Fatalf("expected %q, got %q", want, got)
+		}
+	})
+
+	t.Run("read from closed fifo", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		err = f.file.Close()
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		_, err = f.Read(make([]byte, 1))
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+	})
+}
+
+func TestWrite(t *testing.T) {
+	t.Run("write data to fifo", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+		defer f.file.Close()
+
+		data := []byte("hello")
+		n, err := f.Write(data)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if n != len(data) {
+			t.Fatalf("expected to write %d bytes, got %d", len(data), n)
+		}
+	})
+
+	t.Run("write to closed fifo", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		err = f.file.Close()
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		_, err = f.Write([]byte("hello"))
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+	})
+}
+
+func TestClose(t *testing.T) {
+	t.Run("close removes fifo when owner", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		err = f.Close()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		_, statErr := os.Lstat(path)
+		if !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("expected fifo to be removed, got err %v", statErr)
+		}
+	})
+
+	t.Run("close keeps fifo when not owner", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		_, err := createFifo(path)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		f, err := Open(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		err = f.Close()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		_, statErr := os.Lstat(path)
+		if statErr != nil {
+			t.Fatalf("expected fifo to still exist, got err %v", statErr)
+		}
+	})
+
+	t.Run("close can be called multiple times", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		first := f.Close()
+		second := f.Close()
+		if first != nil {
+			t.Fatalf("expected no error on first close, got %v", first)
+		}
+		if second != first {
+			t.Fatalf("expected same result on second close, got %v vs %v", second, first)
+		}
+	})
+
+	t.Run("close returns the same error on repeated calls", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		f, err := Create(path, os.O_RDWR)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		err = f.file.Close()
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		first := f.Close()
+		second := f.Close()
+		if first == nil {
+			t.Fatalf("expected an error on first close, got nil")
+		}
+		if second != first {
+			t.Fatalf("expected same error on second close, got %v vs %v", second, first)
 		}
 	})
 }

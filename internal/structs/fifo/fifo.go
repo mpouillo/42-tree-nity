@@ -13,6 +13,7 @@ type Fifo struct {
     file  *os.File
     owner bool      // true = send, false = receive
     closeOnce  sync.Once // avoid closing multiple times
+    closeErr	error
 }
 
 // Create a named FIFO at the specified path.
@@ -58,4 +59,26 @@ func Create(path string, flag int) (*Fifo, error) {
 	}
 	f.owner = true
 	return f, nil
+}
+
+func (f *Fifo) Read(p []byte) (int, error)  { return f.file.Read(p) }
+func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
+
+func (f *Fifo) Close() error {
+	f.closeOnce.Do(func() {
+		if f.file != nil {
+			f.closeErr = f.file.Close()
+		}
+
+		if f.owner {
+			err := os.Remove(f.path) 
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				if f.closeErr == nil {
+					f.closeErr = err
+				}
+			}
+		}
+	})
+
+	return f.closeErr
 }
