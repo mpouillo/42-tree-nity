@@ -76,10 +76,10 @@ func TestCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		defer f.file.Close()
+		defer f.Close()
 
-		if f.path != path {
-			t.Fatalf("expected path %q, got %q", path, f.path)
+		if f.Path() != path {
+			t.Fatalf("expected path %q, got %q", path, f.Path())
 		}
 		if !f.owner {
 			t.Fatalf("expected owner = true, got false")
@@ -140,10 +140,10 @@ func TestOpen(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		defer f.file.Close()
+		defer f.Close()
 
-		if f.path != path {
-			t.Fatalf("expected path %q, got %q", path, f.path)
+		if f.Path() != path {
+			t.Fatalf("expected path %q, got %q", path, f.Path())
 		}
 	})
 
@@ -199,7 +199,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
-		defer f.file.Close()
+		defer f.Close()
 
 		want := []byte("hello")
 		_, err = f.Write(want)
@@ -227,7 +227,7 @@ func TestRead(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		err = f.file.Close()
+		err = f.Close()
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -246,7 +246,7 @@ func TestWrite(t *testing.T) {
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
-		defer f.file.Close()
+		defer f.Close()
 
 		data := []byte("hello")
 		n, err := f.Write(data)
@@ -265,7 +265,7 @@ func TestWrite(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		err = f.file.Close()
+		err = f.Close()
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
