@@ -65,36 +65,36 @@ func Create(path string, flag int) (*Fifo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fifo, err := Open(path, flag)
+	f, err := Open(path, flag)
 	if err != nil {
 		if WeCreated {
 			os.Remove(path)
 		}
 		return nil, err
 	}
-	fifo.owner = WeCreated
-	return fifo, nil
+	f.owner = WeCreated
+	return f, nil
 }
 
 func (f *Fifo) Read(p []byte) (int, error)  { return f.file.Read(p) }
 func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
 
 // Closes the Fifo and deletes the file if we are owner of it
-func (fifo *Fifo) Close() error {
-	fifo.closeOnce.Do(func() {
-		if fifo.file != nil {
-			fifo.closeErr = fifo.file.Close()
+func (f *Fifo) Close() error {
+	f.closeOnce.Do(func() {
+		if f.file != nil {
+			f.closeErr = f.file.Close()
 		}
 
-		if fifo.owner {
-			err := os.Remove(fifo.path)
+		if f.owner {
+			err := os.Remove(f.path)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				if fifo.closeErr == nil {
-					fifo.closeErr = err
+				if f.closeErr == nil {
+					f.closeErr = err
 				}
 			}
 		}
 	})
 
-	return fifo.closeErr
+	return f.closeErr
 }
