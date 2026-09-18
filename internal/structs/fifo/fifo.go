@@ -11,7 +11,7 @@ import (
 type Fifo struct {
     path  string
     file  *os.File
-    owner bool      // true = send, false = receive
+    owner bool      // true = we create the fifo and must remove it
     closeOnce  sync.Once // avoid closing multiple times
     closeErr	error
 }
@@ -40,45 +40,61 @@ func createFifo(path string) (created bool, err error) {
 
 // waits until the FIFO is available for the specified flags and then opens it.
 func Open(path string, flags int) (*Fifo, error) {
-	file, err := os.OpenFile(path, flags, 0)
+	// O_NOFOLLOW: refuse symlinks (keep files in /tmp)
+	file, err := os.OpenFile(path, flags|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
 	}
+
+	fi, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if fi.Mode()&os.ModeNamedPipe == 0 {
+		file.Close()
+		return nil, fmt.Errorf("fifo: %s is not a FIFO (%s)", path, fi.Mode())
+	}
+
 	return &Fifo{path: path, file: file}, nil
 }
 
+// Create creates a named FIFO at the specified path and opens it with the specified flags.
 func Create(path string, flag int) (*Fifo, error) {
-	_, err := createFifo(path)
+	we_created, err := createFifo(path)
 	if err != nil {
 		return nil, err
 	}
-	f, err := Open(path, flag)
+	fifo, err := Open(path, flag)
 	if err != nil {
-		os.Remove(path)
+		if we_created{
+			os.Remove(path)
+		}
 		return nil, err
 	}
-	f.owner = true
-	return f, nil
+	fifo.owner = we_created
+	return fifo, nil
 }
 
 func (f *Fifo) Read(p []byte) (int, error)  { return f.file.Read(p) }
 func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
 
-func (f *Fifo) Close() error {
-	f.closeOnce.Do(func() {
-		if f.file != nil {
-			f.closeErr = f.file.Close()
+// Closes the Fifo and deletes the file if we are owner of it
+func (fifo *Fifo) Close() error {
+	fifo.closeOnce.Do(func() {
+		if fifo.file != nil {
+			fifo.closeErr = fifo.file.Close()
 		}
 
-		if f.owner {
-			err := os.Remove(f.path) 
+		if fifo.owner {
+			err := os.Remove(fifo.path) 
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				if f.closeErr == nil {
-					f.closeErr = err
+				if fifo.closeErr == nil {
+					fifo.closeErr = err
 				}
 			}
 		}
 	})
 
-	return f.closeErr
+	return fifo.closeErr
 }
