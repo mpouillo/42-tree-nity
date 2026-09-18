@@ -17,7 +17,7 @@ type Fifo struct {
 
 // Create a named FIFO at the specified path.
 // returns true if the FIFO was created, false if it already exists, and an error if any.
-func Create(path string) (created bool, err error) {
+func createFifo(path string) (created bool, err error) {
 	err = syscall.Mkfifo(path, fifoPerms)
 	if err == nil {
 		return true, nil
@@ -44,4 +44,18 @@ func Open(path string, flags int) (*Fifo, error) {
 		return nil, err
 	}
 	return &Fifo{path: path, file: file}, nil
+}
+
+func Create(path string, flag int) (*Fifo, error) {
+	_, err := createFifo(path)
+	if err != nil {
+		return nil, err
+	}
+	f, err := Open(path, flag)
+	if err != nil {
+		os.Remove(path)
+		return nil, err
+	}
+	f.owner = true
+	return f, nil
 }
