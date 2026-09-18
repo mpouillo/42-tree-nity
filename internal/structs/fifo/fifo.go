@@ -82,9 +82,7 @@ func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
 // Closes the Fifo and deletes the file if we are owner of it
 func (f *Fifo) Close() error {
 	f.closeOnce.Do(func() {
-		if f.file != nil {
-			f.closeErr = f.file.Close()
-		}
+		f.closeErr = f.file.Close()
 
 		if f.owner {
 			err := os.Remove(f.path)
