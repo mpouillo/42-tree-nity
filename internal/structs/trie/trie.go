@@ -1,55 +1,60 @@
 package trie
 
-type Node struct {
-	Values    []any
-	Children map[rune]*Node
+type Node[T any] struct {
+    Value    T
+    Children map[rune]*Node[T]
 }
 
-func NewNode() *Node {
-	return &Node{
-		Values:    nil,
-		Children: make(map[rune]*Node),
-	}
+func NewNode[T any](value T) *Node[T] {
+    return &Node[T]{
+        Value:    value,
+        Children: make(map[rune]*Node[T]),
+    }
 }
 
-type Trie struct {
-	RootNode *Node
+type Trie[T any] struct {
+    RootNode *Node[T]
 }
 
-func NewTrie() *Trie {
-	return &Trie{RootNode: NewNode()}
+func NewTrie[T any]() *Trie[T] {
+    var zero T
+    root := NewNode(zero)
+    return &Trie[T]{RootNode: root}
 }
 
-func (t *Trie) Insert(key string, value any) {
-	current := t.RootNode
-	for _, char := range key {
-		if _, exists := current.Children[char]; !exists {
-			current.Children[char] = NewNode()
-		}
-		current = current.Children[char]
-	}
-	current.Values = append(current.Values, value)
-}
-
-func (t *Trie) Search(key string) ([]any, error) {
+func (t *Trie[T]) Insert(key string, value T) {
     current := t.RootNode
-    var matches []any
+    var zero T
 
-    if len(current.Values) > 0 {
-        matches = append(matches, current.Values...)
+    for _, char := range key {
+        if _, exists := current.Children[char]; !exists {
+            current.Children[char] = NewNode(zero)
+        }
+        current = current.Children[char]
+    }
+    current.Value = value
+}
+
+func (t *Trie[T]) Search(key string) []T {
+    current := t.RootNode
+    var matches []T
+    var zero T
+
+    if any(current.Value) != any(zero) {
+        matches = append(matches, current.Value)
     }
 
     for _, char := range key {
         next, exists := current.Children[char]
         if !exists {
-            break
+            return matches
         }
         current = next
 
-        if len(current.Values) > 0 {
-            matches = append(matches, current.Values...)
+        if any(current.Value) != any(zero) {
+            matches = append(matches, current.Value)
         }
     }
 
-    return matches, nil
+    return matches
 }
