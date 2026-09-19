@@ -17,14 +17,14 @@ func NewMessage(key, body string) *Message {
 
 type Topic struct {
 	Name        string
-	subscribers trie.Trie
+	subscribers trie.Trie[string]
 	messages    []Message
 }
 
 func NewTopic(name string) *Topic {
 	return &Topic{
 		Name: name,
-		subscribers: *trie.NewTrie(),
+		subscribers: *trie.NewTrie[string](),
 		messages: []Message{},
 	}
 }
