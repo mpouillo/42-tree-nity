@@ -38,8 +38,13 @@ func createFifo(path string) (created bool, err error) {
 	return false, nil
 }
 
-// waits until the FIFO is available for the specified flags and then opens it.
-func Open(path string, flags int) (*Fifo, error) {
+// Open opens a named FIFO at the specified path with the specified opening mode.
+func Open(path string, openmode Mode) (*Fifo, error) {
+	flags, err := openmode.flags()
+	if err != nil {
+		return nil, err
+	}
+	
 	// O_NOFOLLOW: refuse symlinks (keep files in /tmp)
 	file, err := os.OpenFile(path, flags|syscall.O_NOFOLLOW, 0)
 	if err != nil {
@@ -59,14 +64,15 @@ func Open(path string, flags int) (*Fifo, error) {
 	return &Fifo{path: path, file: file}, nil
 }
 
-// Create creates a named FIFO at the specified path and opens it with the specified flags.
+// Create creates a named FIFO at the specified path and opens it with the specified opening mode.
 // If the FIFO already existed, it is reused and will not be removed on Close.
-func Create(path string, flag int) (*Fifo, error) {
+func Create(path string, openmode Mode) (*Fifo, error) {
 	WeCreated, err := createFifo(path)
 	if err != nil {
 		return nil, err
 	}
-	f, err := Open(path, flag)
+
+	f, err := Open(path, openmode)
 	if err != nil {
 		if WeCreated {
 			os.Remove(path)

@@ -72,7 +72,7 @@ func TestCreate(t *testing.T) {
 	t.Run("create new fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
 
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -101,12 +101,27 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err == nil {
 			t.Fatalf("expected error for non-fifo path, got nil")
 		}
 		if f != nil {
 			t.Fatalf("expected nil Fifo, got %v", f)
+		}
+	})
+
+	t.Run("create with an unknown mode removes the fifo it created", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+
+		f, err := Create(path, Mode(42))
+		if err == nil {
+			f.Close()
+			t.Fatalf("expected error for unknown mode, got nil")
+		}
+
+		_, statErr := os.Lstat(path)
+		if !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("expected fifo to be removed, got err %v", statErr)
 		}
 	})
 
@@ -116,7 +131,7 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("setup: %v", err)
 		}
 
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -136,7 +151,7 @@ func TestOpen(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		f, err := Open(path, os.O_RDWR)
+		f, err := Open(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -150,7 +165,7 @@ func TestOpen(t *testing.T) {
 	t.Run("open nonexistent path", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "missing.fifo")
 
-		_, err := Open(path, os.O_RDONLY)
+		_, err := Open(path, Read)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -170,10 +185,24 @@ func TestOpen(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		f, err := Open(link, os.O_RDWR)
+		f, err := Open(link, ReadWrite)
 		if err == nil {
 			f.Close()
 			t.Fatalf("expected error for symlink, got nil")
+		}
+	})
+
+	t.Run("open with an unknown mode is rejected", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "test.fifo")
+		_, err := createFifo(path)
+		if err != nil {
+			t.Fatalf("setup: expected no error, got %v", err)
+		}
+
+		f, err := Open(path, Mode(42))
+		if err == nil {
+			f.Close()
+			t.Fatalf("expected error for unknown mode, got nil")
 		}
 	})
 
@@ -184,7 +213,7 @@ func TestOpen(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		f, err := Open(path, os.O_RDWR)
+		f, err := Open(path, ReadWrite)
 		if err == nil {
 			f.Close()
 			t.Fatalf("expected error for regular file, got nil")
@@ -195,7 +224,7 @@ func TestOpen(t *testing.T) {
 func TestRead(t *testing.T) {
 	t.Run("read data written to fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -222,7 +251,7 @@ func TestRead(t *testing.T) {
 
 	t.Run("read from closed fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -242,7 +271,7 @@ func TestRead(t *testing.T) {
 func TestWrite(t *testing.T) {
 	t.Run("write data to fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -260,7 +289,7 @@ func TestWrite(t *testing.T) {
 
 	t.Run("write to closed fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -280,7 +309,7 @@ func TestWrite(t *testing.T) {
 func TestClose(t *testing.T) {
 	t.Run("close removes fifo when owner", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -303,7 +332,7 @@ func TestClose(t *testing.T) {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
 
-		f, err := Open(path, os.O_RDWR)
+		f, err := Open(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -321,7 +350,7 @@ func TestClose(t *testing.T) {
 
 	t.Run("close can be called multiple times", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
@@ -338,7 +367,7 @@ func TestClose(t *testing.T) {
 
 	t.Run("close returns the same error on repeated calls", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
-		f, err := Create(path, os.O_RDWR)
+		f, err := Create(path, ReadWrite)
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
