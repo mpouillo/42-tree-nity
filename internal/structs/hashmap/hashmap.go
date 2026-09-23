@@ -66,5 +66,5 @@ func (hashmap *Hashmap) Get(key string) (any, error) {
 			return entry.value, nil
 		}
 	}
-	return nil, errKeyNotFound
+	return nil, ErrKeyNotFound
 }

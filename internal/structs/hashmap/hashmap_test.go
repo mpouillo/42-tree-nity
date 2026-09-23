@@ -127,7 +127,7 @@ func TestGet(t *testing.T) {
 	t.Run("check good error", func(t *testing.T) {
 		hm := NewHashMap()
 		_, err := hm.Get("hello")
-		if !errors.Is(err, errKeyNotFound) {
+		if !errors.Is(err, ErrKeyNotFound) {
 			t.Fatalf("expected error 'key not found', got '%v'", err)
 		}
 	})
