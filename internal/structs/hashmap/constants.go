@@ -9,4 +9,4 @@ const (
 	filled_factor_before_resize float32 = 0.75
 )
 
-var key_not_found = errors.New("key not found")
+var errKeyNotFound = errors.New("key not found")

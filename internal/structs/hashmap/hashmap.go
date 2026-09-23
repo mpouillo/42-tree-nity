@@ -48,7 +48,7 @@ func (hashmap *Hashmap) Insert(key string, value any) {
 	if inserted >= max_entries_before_resize {
 		hashmap.resize()
 	}
-	var index uint64 = hash(key, hashmap.cap())
+	var index = hash(key, hashmap.cap())
 	for i := range hashmap.elements[index].entries {
 		if hashmap.elements[index].entries[i].key == key {
 			hashmap.elements[index].entries[i].value = value
@@ -66,5 +66,5 @@ func (hashmap *Hashmap) Get(key string) (any, error) {
 			return entry.value, nil
 		}
 	}
-	return nil, key_not_found
+	return nil, errKeyNotFound
 }
