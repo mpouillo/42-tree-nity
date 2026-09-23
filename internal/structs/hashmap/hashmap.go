@@ -42,18 +42,20 @@ func (hashmap *Hashmap) resize() {
 }
 
 func (hashmap *Hashmap) Insert(key string, value any) {
-
-	inserted := hashmap.nb_inserted + 1
-	max_entries_before_resize := uint64(float32(hashmap.cap()) * filled_factor_before_resize)
-	if inserted >= max_entries_before_resize {
-		hashmap.resize()
-	}
 	var index = hash(key, hashmap.cap())
 	for i := range hashmap.elements[index].entries {
 		if hashmap.elements[index].entries[i].key == key {
 			hashmap.elements[index].entries[i].value = value
 			return
 		}
+	}
+
+	// only a new key grows the map, so resize after the lookup
+	inserted := hashmap.nb_inserted + 1
+	max_entries_before_resize := uint64(float32(hashmap.cap()) * filled_factor_before_resize)
+	if inserted >= max_entries_before_resize {
+		hashmap.resize()
+		index = hash(key, hashmap.cap())
 	}
 	hashmap.nb_inserted++
 	hashmap.elements[index].append(key, value)
