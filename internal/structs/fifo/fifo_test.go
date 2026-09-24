@@ -76,7 +76,7 @@ func TestCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		if f.Path() != path {
 			t.Fatalf("expected path %q, got %q", path, f.Path())
@@ -115,7 +115,7 @@ func TestCreate(t *testing.T) {
 
 		f, err := Create(path, Mode(42))
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			t.Fatalf("expected error for unknown mode, got nil")
 		}
 
@@ -135,7 +135,7 @@ func TestCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		if f.owner {
 			t.Fatalf("expected owner = false when the fifo already existed")
@@ -155,7 +155,7 @@ func TestOpen(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		if f.Path() != path {
 			t.Fatalf("expected path %q, got %q", path, f.Path())
@@ -187,7 +187,7 @@ func TestOpen(t *testing.T) {
 
 		f, err := Open(link, ReadWrite)
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			t.Fatalf("expected error for symlink, got nil")
 		}
 	})
@@ -201,7 +201,7 @@ func TestOpen(t *testing.T) {
 
 		f, err := Open(path, Mode(42))
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			t.Fatalf("expected error for unknown mode, got nil")
 		}
 	})
@@ -215,7 +215,7 @@ func TestOpen(t *testing.T) {
 
 		f, err := Open(path, ReadWrite)
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			t.Fatalf("expected error for regular file, got nil")
 		}
 	})
@@ -228,7 +228,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		want := []byte("hello")
 		_, err = f.Write(want)
@@ -275,7 +275,7 @@ func TestWrite(t *testing.T) {
 		if err != nil {
 			t.Fatalf("setup: expected no error, got %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		data := []byte("hello")
 		n, err := f.Write(data)

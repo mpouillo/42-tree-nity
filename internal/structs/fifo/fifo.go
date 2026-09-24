@@ -44,7 +44,7 @@ func Open(path string, openmode Mode) (*Fifo, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// O_NOFOLLOW: refuse symlinks (keep files in /tmp)
 	file, err := os.OpenFile(path, flags|syscall.O_NOFOLLOW, 0)
 	if err != nil {
@@ -53,11 +53,11 @@ func Open(path string, openmode Mode) (*Fifo, error) {
 
 	fi, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, err
 	}
 	if fi.Mode()&os.ModeNamedPipe == 0 {
-		file.Close()
+		_ = file.Close()
 		return nil, fmt.Errorf("fifo: %s is not a FIFO (%s)", path, fi.Mode())
 	}
 
@@ -75,7 +75,7 @@ func Create(path string, openmode Mode) (*Fifo, error) {
 	f, err := Open(path, openmode)
 	if err != nil {
 		if WeCreated {
-			os.Remove(path)
+			_ = os.Remove(path)
 		}
 		return nil, err
 	}
