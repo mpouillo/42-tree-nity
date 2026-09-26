@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
@@ -26,6 +29,15 @@ func main() {
 		return
 	}
 	defer func() { _ = f.Close() }()
-
 	fmt.Println(f.Path())
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		_ = f.Close()
+	}()
+
+	//serve()
 }
