@@ -43,7 +43,7 @@ func TestFromSeparator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actual := FromSeparator([]byte(tt.input), ":")
-			expected := &Message{Key: tt.key, Body: []byte(tt.body), Offset: 0}
+			expected := &Message{Key: tt.key, Body: []byte(tt.body), Offset: 0, Raw: false}
 
 			assert.Equal(t, expected, actual)
 		})
@@ -88,7 +88,7 @@ func TestFromRaw(t *testing.T) {
 			msg := encodeMessage(tt.key, tt.body)
 
 			actual, err := FromRaw(msg)
-			expected := &Message{Key: tt.key, Body: []byte(tt.body), Offset: 0}
+			expected := &Message{Key: tt.key, Body: []byte(tt.body), Offset: 0, Raw: true}
 
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
@@ -140,19 +140,19 @@ func TestToRaw(t *testing.T) {
 	}{
 		{
 			name: "empty message",
-			msg:  &Message{Key: "", Body: []byte(""), Offset: 0},
+			msg:  &Message{Key: "", Body: []byte(""), Offset: 0, Raw: true},
 		},
 		{
 			name: "regular message",
-			msg:  &Message{Key: "user.input", Body: []byte("hello, world!"), Offset: 0},
+			msg:  &Message{Key: "user.input", Body: []byte("hello, world!"), Offset: 0, Raw: true},
 		},
 		{
 			name: "empty key with body",
-			msg:  &Message{Key: "", Body: []byte("body payload"), Offset: 0},
+			msg:  &Message{Key: "", Body: []byte("body payload"), Offset: 0, Raw: true},
 		},
 		{
 			name: "key with empty body",
-			msg:  &Message{Key: "user.input", Body: []byte(""), Offset: 0},
+			msg:  &Message{Key: "user.input", Body: []byte(""), Offset: 0, Raw: true},
 		},
 	}
 
@@ -180,4 +180,42 @@ func encodeMessage(key, body string) []byte {
 	buf = append(buf, body...)
 
 	return buf
+}
+
+
+func TestToSeparator(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  *Message
+	}{
+		{
+			name: "empty message",
+			msg:  &Message{Key: "", Body: []byte(""), Offset: 0, Raw: false},
+		},
+		{
+			name: "regular message",
+			msg:  &Message{Key: "user.input", Body: []byte("hello, world!"), Offset: 0, Raw: false},
+		},
+		{
+			name: "empty key with body",
+			msg:  &Message{Key: "", Body: []byte("body payload"), Offset: 0, Raw: false},
+		},
+		{
+			name: "key with empty body",
+			msg:  &Message{Key: "user.input", Body: []byte(""), Offset: 0, Raw: false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sep := ":"
+			actualBytes := tt.msg.ToSeparator(sep)
+			expectedBytes := []byte(tt.msg.Key + ":" + string(tt.msg.Body))
+
+			assert.Equal(t, expectedBytes, actualBytes)
+
+			decodedMsg := FromSeparator(actualBytes, sep)
+			assert.Equal(t, tt.msg, decodedMsg)
+		})
+	}
 }
