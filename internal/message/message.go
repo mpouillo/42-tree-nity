@@ -13,6 +13,7 @@ type Message struct {
 	Key    string
 	Body   []byte
 	Offset uint32
+	Raw    bool
 }
 
 func FromSeparator(msg []byte, sep string) *Message {
@@ -28,6 +29,7 @@ func FromSeparator(msg []byte, sep string) *Message {
 		Key:    string(key),
 		Body:   body,
 		Offset: 0,
+		Raw:    false,
 	}
 }
 
@@ -61,6 +63,7 @@ func FromRaw(msg []byte) (*Message, error) {
 		Key:    key,
 		Body:   body,
 		Offset: 0,
+		Raw:    true,
 	}, nil
 }
 
@@ -69,6 +72,14 @@ func (m *Message) ToRaw() []byte {
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Key)))
 	buf = append(buf, m.Key...)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Body)))
+	buf = append(buf, m.Body...)
+	return buf
+}
+
+func (m *Message) ToSeparator(sep string) []byte {
+	buf := make([]byte, 0, len(m.Key)+len(sep)+len(m.Body))
+	buf = append(buf, m.Key...)
+	buf = append(buf, sep...)
 	buf = append(buf, m.Body...)
 	return buf
 }
