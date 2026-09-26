@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
-	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 	"path/filepath"
+
+	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
 func serverFifoPath(dir string, pid int) string {
-      return filepath.Join(dir, fmt.Sprintf("treenity.server.%d", pid))
+	return filepath.Join(dir, fmt.Sprintf("treenity.server.%d", pid))
 }
 
 func openServerFifo(mode fifo.Mode) (*fifo.Fifo, error) {
@@ -25,6 +26,6 @@ func main() {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	
+
 	fmt.Println(f.Path())
 }
