@@ -1,6 +1,8 @@
 package consumer
 
 import (
+	"encoding/binary"
+
 	message "github.com/mpouillo/42-tree-nity/internal/message"
 	fifo "github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
@@ -21,14 +23,27 @@ func NewConsumer(id, ipcPath, topic, prefix string, offset uint32) (*Consumer, e
 	}
 
 	return &Consumer{
-		ID: id,
-		Topic: topic,
+		ID:     id,
+		Topic:  topic,
 		Offset: offset,
 		Prefix: prefix,
-		Fifo: fifo,
+		Fifo:   fifo,
 	}, nil
 }
 
-func (c *Consumer) Deliver(msg message.Message) {}
+func (c *Consumer) Deliver(msg message.Message) (int, error) {
+	var contents []byte
 
-func (c *Consumer) CloseIPCChannel() {}
+	if msg.Raw {
+		binary.LittleEndian.AppendUint32(contents, msg.Offset)
+		contents = append(msg.ToRaw(), contents...)
+	} else {
+		contents = msg.ToSeparator(":")
+	}
+
+	return c.Fifo.Write(contents)
+}
+
+func (c *Consumer) CloseIPCChannel() error {
+	return c.Fifo.Close()
+}
