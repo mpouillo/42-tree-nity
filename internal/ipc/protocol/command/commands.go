@@ -59,7 +59,7 @@ type Disconnect struct {
 	Client  string
 }
 
-func GetProduce(packet packet.Packet) (*Produce, error) {
+func NewProduce(packet packet.Packet) (*Produce, error) {
 	if packet.Header.Command != CmdProduce {
 		return nil, errors.New("invalid packet command type")
 	}
