@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/ayberkgezer/gocolorlog"
+
+	"github.com/mpouillo/42-tree-nity/internal/server"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
@@ -17,7 +20,6 @@ func serverFifoPath(dir string, pid int) string {
 
 func openServerFifo(mode fifo.Mode) (*fifo.Fifo, error) {
 	pid := os.Getpid()
-
 	path := serverFifoPath("/tmp", pid)
 	return fifo.Create(path, mode)
 }
@@ -25,19 +27,16 @@ func openServerFifo(mode fifo.Mode) (*fifo.Fifo, error) {
 func main() {
 	f, err := openServerFifo(fifo.ReadWrite)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create fifo: %v\n", err)
-		return
+		gocolorlog.Fatalf("failed to create fifo: %v\n", err)
 	}
-	defer func() { _ = f.Close() }()
-	fmt.Println(f.Path())
+	defer f.Close()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	go func() {
-		<-ctx.Done()
-		_ = f.Close()
-	}()
+	srv := server.NewServer()
 
-	//serve()
+	if err := srv.Serve(ctx, f); err != nil {
+		gocolorlog.Fatalf("server error: %v", err)
+	}
 }
