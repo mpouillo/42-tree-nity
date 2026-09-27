@@ -1,22 +1,33 @@
 package main
 
 import (
-	// "flag"
 	"os"
 	"fmt"
-	
+	"github.com/ayberkgezer/gocolorlog"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
 func main() {
-	// flagset := flag.NewFlagSet("subscribe", flag.ContinueOnError)
 	args := os.Args[1:]
-	argc := len(args)
-	// raw := flagset.Bool("raw", false, "binary format")    // *bool
-	// prefix := flagset.String("prefix", "", "key prefix")  // *string
-	// offset := flagset.Int("offset", 0, "starting offset") // *int
-	// err := flagset.Parse(os.Args[1:])
-	// if argc < 2 {
-	// 	os.Exit()
-	// }
-	fmt.Println(args, argc)
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: client <ipc> <command> [args]")
+		os.Exit(int(response.GeneralError))
+	}
+	ipc, cmd, rest := args[0], args[1], args[2:]
+	command := ClientCommand{ipc: ipc, args: rest}
+	switch cmd {
+	case "create":
+		cmdCreate(command)
+	case "list":
+		cmdList(command)
+	case "produce":
+		cmdProduce(command)
+	case "subscribe":
+		cmdSubscribe(command)
+	case "info":
+		cmdInfo(command)
+	default:
+		gocolorlog.Errorf("unknown command %q\n", cmd)
+		os.Exit(int(response.GeneralError))
+	}
 }
