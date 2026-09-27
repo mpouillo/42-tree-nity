@@ -33,6 +33,7 @@ install-go:
 test:
 	@go build && echo "All good!"
 	@go test ./... && echo "All good!"
+	@golangci-lint run
 
 clean:
 	go clean
