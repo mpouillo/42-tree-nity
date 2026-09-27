@@ -26,7 +26,9 @@ install-go:
 	@mkdir -p "$$HOME/go-workspace"
 	@printf '\n# Go environment configuration\nexport GOPATH="$$HOME/go-workspace"\nexport GOROOT="$$HOME/go"\nexport PATH="$$PATH:$$GOROOT/bin:$$GOPATH/bin"\n' >> "$$HOME/.profile"
 	@echo "Go installed successfully."
-	@echo "Run 'source ~/.profile' or restart your terminal to update your current PATH."
+	@echo "Installing golangci-lint..."
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+	@echo "Done. Run 'source ~/.profile' or restart your terminal to update your current PATH."
 
 test:
 	@go build && echo "All good!"

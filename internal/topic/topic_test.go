@@ -16,11 +16,12 @@ import (
 func TestNewTopic(t *testing.T) {
 	ctx := context.Background()
 	got := NewTopic(ctx, "test")
-	defer got.Close()
 
 	assert.Equal(t, "test", got.Name)
 	assert.Equal(t, uint32(0), got.nextOffset)
 	assert.Empty(t, got.messages)
+
+	_ = got.Close()
 }
 
 func TestProduce(t *testing.T) {
@@ -40,19 +41,20 @@ func TestProduce(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			topic := NewTopic(ctx, "test")
-			defer topic.Close()
 
 			offset, err := topic.Produce(tt.key, []byte(tt.body))
 			require.NoError(t, err)
 			assert.Equal(t, uint32(0), offset)
 
 			topic.mu.RLock()
-			defer topic.mu.RUnlock()
 
 			require.Len(t, topic.messages, 1)
 			assert.Equal(t, tt.key, topic.messages[0].Key)
 			assert.Equal(t, []byte(tt.body), topic.messages[0].Body)
 			assert.Equal(t, uint32(0), topic.messages[0].Offset)
+
+			topic.mu.RUnlock()
+			_ = topic.Close()
 		})
 	}
 }
@@ -60,7 +62,6 @@ func TestProduce(t *testing.T) {
 func TestProduce_SequentialOffsets(t *testing.T) {
 	ctx := context.Background()
 	topic := NewTopic(ctx, "test")
-	defer topic.Close()
 
 	o1, err := topic.Produce("k1", []byte("v1"))
 	require.NoError(t, err)
@@ -73,6 +74,8 @@ func TestProduce_SequentialOffsets(t *testing.T) {
 	o3, err := topic.Produce("k3", []byte("v3"))
 	require.NoError(t, err)
 	assert.Equal(t, uint32(2), o3)
+
+	_ = topic.Close()
 }
 
 func TestProduce_AfterClose(t *testing.T) {
@@ -88,7 +91,6 @@ func TestProduce_AfterClose(t *testing.T) {
 func TestMatchConsumers(t *testing.T) {
 	ctx := context.Background()
 	topic := NewTopic(ctx, "test")
-	defer topic.Close()
 
 	cAll := &consumer.Consumer{ID: "c1", Prefix: ""}
 	cUser := &consumer.Consumer{ID: "c2", Prefix: "user."}
@@ -115,24 +117,26 @@ func TestMatchConsumers(t *testing.T) {
 	matchedBilling := topic.MatchConsumers("billing.paid")
 	assert.Len(t, matchedBilling, 1)
 	assert.Equal(t, cAll, matchedBilling[0])
+
+	_ = topic.Close()
 }
 
 func TestSubscribe_DuplicateClient(t *testing.T) {
 	ctx := context.Background()
 	topic := NewTopic(ctx, "test")
-	defer topic.Close()
 
 	c := &consumer.Consumer{ID: "client-1"}
 	topic.consumers[c.ID] = c
 
 	err := topic.Subscribe(c)
 	assert.ErrorIs(t, err, ErrDuplicateClient)
+
+	_ = topic.Close()
 }
 
 func TestUnsubscribe(t *testing.T) {
 	ctx := context.Background()
 	topic := NewTopic(ctx, "test")
-	defer topic.Close()
 
 	c := &consumer.Consumer{ID: "client-1", Prefix: "user."}
 	topic.consumers[c.ID] = c
@@ -142,16 +146,16 @@ func TestUnsubscribe(t *testing.T) {
 
 	assert.Empty(t, topic.consumers)
 	assert.Empty(t, topic.MatchConsumers("user.created"))
+
+	_ = topic.Close()
 }
 
 // Integration test verifying Subscribe catch-up & live dispatch over an IPC FIFO
 func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	pipePath, reader := setupTestFIFO(t)
-	defer reader.Close()
 
 	ctx := context.Background()
 	topic := NewTopic(ctx, "test")
-	defer topic.Close()
 
 	// 1. Produce historical message before subscription
 	_, err := topic.Produce("user.login", []byte("historical"))
@@ -175,6 +179,9 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	n, err := reader.Read(buf)
 	require.NoError(t, err)
 	assert.Greater(t, n, 0)
+
+	_ = topic.Close()
+	_ = reader.Close()
 }
 
 // Helper to create a non-blocking FIFO reader for IPC delivery testing
