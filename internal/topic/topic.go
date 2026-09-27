@@ -1,43 +1,192 @@
 package topic
 
 import (
+	"context"
+	"errors"
 	"strings"
+	"sync"
 
+	"github.com/mpouillo/42-tree-nity/internal/consumer"
+	message "github.com/mpouillo/42-tree-nity/internal/message"
 	trie "github.com/mpouillo/42-tree-nity/internal/structs/trie"
 )
 
-type Message struct {
-	key  string
-	body string
-}
-
-func NewMessage(key, body string) *Message {
-	return &Message{key, body}
-}
+var ErrDuplicateClient = errors.New("client already exists")
+var ErrTopicClosed = errors.New("topic is closed")
 
 type Topic struct {
-	Name        string
-	subscribers trie.Trie[string]
-	messages    []Message
+	Name       string
+	mu         sync.RWMutex
+	messages   []message.Message
+	nextOffset uint32
+	prefixTrie *trie.Trie[*consumer.Consumer]
+	consumers  map[string]*consumer.Consumer
+	msgChan    chan message.Message
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
 }
 
-func NewTopic(name string) *Topic {
-	return &Topic{
-		Name: name,
-		subscribers: *trie.NewTrie[string](),
-		messages: []Message{},
+func NewTopic(parentCtx context.Context, name string) *Topic {
+	ctx, cancel := context.WithCancel(parentCtx)
+
+	t := &Topic{
+		Name:       name,
+		messages:   make([]message.Message, 0),
+		nextOffset: 0,
+		prefixTrie: trie.NewTrie[*consumer.Consumer](),
+		consumers:  make(map[string]*consumer.Consumer),
+		msgChan:    make(chan message.Message, 1024),
+		ctx:        ctx,
+		cancel:     cancel,
+	}
+
+	t.wg.Add(1)
+	go t.run()
+	return t
+}
+
+func (t *Topic) run() {
+	defer t.wg.Done()
+
+	for {
+		select {
+		case msg := <-t.msgChan:
+			t.processAndDispatch(msg)
+		case <-t.ctx.Done():
+			t.drainAndFlush()
+			return
+		}
 	}
 }
 
-func (t *Topic) Push(message string) {
-	key, body := splitKeyBody(message)
-	t.messages = append(t.messages, *NewMessage(key, body))
+func (t *Topic) Close() error {
+	t.cancel()
+	t.wg.Wait()
+	return nil
 }
 
-func splitKeyBody(input string) (string, string) {
-	parts := strings.SplitN(input, ":", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1]
+func (t *Topic) Produce(key string, body []byte) (uint32, error) {
+	if t.ctx.Err() != nil {
+		return 0, ErrTopicClosed
 	}
-	return parts[0], ""
+
+	t.mu.Lock()
+	offset := t.nextOffset
+	t.nextOffset++
+
+	msg := message.Message{
+		Key:    key,
+		Body:   body,
+		Offset: offset,
+	}
+
+	t.messages = append(t.messages, msg)
+	t.mu.Unlock()
+
+	select {
+	case t.msgChan <- msg:
+		return offset, nil
+	case <-t.ctx.Done():
+		return 0, ErrTopicClosed
+	}
+}
+
+func (t *Topic) Subscribe(c *consumer.Consumer) error {
+	if t.ctx.Err() != nil {
+		return ErrTopicClosed
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if _, exists := t.consumers[c.ID]; exists {
+		return ErrDuplicateClient
+	}
+
+	// Catch up consumer
+	currentOffset := c.Offset.Load()
+	for _, msg := range t.messages {
+		if msg.Offset >= currentOffset {
+			if c.Prefix == "" || strings.HasPrefix(msg.Key, c.Prefix) {
+				_, err := c.Deliver(msg)
+				if err != nil {
+					return err
+				}
+				c.Offset.Store(msg.Offset + 1)
+			}
+		}
+	}
+
+	t.consumers[c.ID] = c
+	if c.Prefix != "" {
+		t.prefixTrie.Insert(c.Prefix, c)
+	}
+	return nil
+}
+
+func (t *Topic) Unsubscribe(clientID string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	c, exists := t.consumers[clientID]
+	if !exists {
+		return
+	}
+
+	if c.Prefix != "" {
+		t.prefixTrie.Remove(c.Prefix, c, func(a, b *consumer.Consumer) bool { return a.ID == b.ID })
+	}
+
+	delete(t.consumers, clientID)
+}
+
+func (t *Topic) MatchConsumers(key string) []*consumer.Consumer {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	var matched []*consumer.Consumer
+
+	for _, c := range t.consumers {
+		if c.Prefix == "" {
+			matched = append(matched, c)
+		}
+	}
+
+	prefixMatches := t.prefixTrie.Search(key)
+	matched = append(matched, prefixMatches...)
+
+	return matched
+}
+
+func (t *Topic) processAndDispatch(msg message.Message) {
+	subscribers := t.MatchConsumers(msg.Key)
+
+	for _, c := range subscribers {
+		if msg.Offset >= c.Offset.Load() {
+			_, err := c.Deliver(msg)
+			if err != nil {
+				// consumer pipe is broken or disconnected
+				t.Unsubscribe(c.ID)
+				continue
+			}
+			c.Offset.Store(msg.Offset + 1)
+		}
+	}
+}
+
+func (t *Topic) drainAndFlush() {
+	for len(t.msgChan) > 0 {
+		msg := <-t.msgChan
+		t.processAndDispatch(msg)
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for id, c := range t.consumers {
+		// remember to send error code 3 here when implemented
+		_ = c.CloseIPCChannel()
+		delete(t.consumers, id)
+	}
 }
