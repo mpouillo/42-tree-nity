@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"encoding/binary"
+	"sync/atomic"
 
 	message "github.com/mpouillo/42-tree-nity/internal/message"
 	fifo "github.com/mpouillo/42-tree-nity/internal/structs/fifo"
@@ -10,33 +11,37 @@ import (
 type Consumer struct {
 	ID     string
 	Topic  string
-	Offset uint32
 	Prefix string
+	Offset atomic.Uint32
 	Fifo   *fifo.Fifo
 }
 
-func NewConsumer(id, ipcPath, topic, prefix string, offset uint32) (*Consumer, error) {
+func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Consumer, error) {
 	fifo, err := fifo.Open(ipcPath, fifo.Write)
-
 	if err != nil {
 		return nil, err
 	}
 
-	return &Consumer{
+	c := &Consumer{
 		ID:     id,
 		Topic:  topic,
-		Offset: offset,
 		Prefix: prefix,
 		Fifo:   fifo,
-	}, nil
+	}
+	c.Offset.Store(offset)
+	return c, nil
 }
 
 func (c *Consumer) Deliver(msg message.Message) (int, error) {
+	if c == nil || c.Fifo == nil {
+		return 0, nil
+	}
+
 	var contents []byte
 
 	if msg.Raw {
-		binary.LittleEndian.AppendUint32(contents, msg.Offset)
-		contents = append(msg.ToRaw(), contents...)
+		contents = binary.LittleEndian.AppendUint32(nil, msg.Offset)
+		contents = append(contents, msg.ToRaw()...)
 	} else {
 		contents = msg.ToSeparator(":")
 	}
@@ -45,5 +50,9 @@ func (c *Consumer) Deliver(msg message.Message) (int, error) {
 }
 
 func (c *Consumer) CloseIPCChannel() error {
+	if c == nil || c.Fifo == nil {
+		return nil
+	}
+
 	return c.Fifo.Close()
 }
