@@ -10,7 +10,7 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: client <ipc> <command> [args]")
+		gocolorlog.Errorf("usage: client <ipc> <command> [args]")
 		os.Exit(int(response.GeneralError))
 	}
 	ipc, cmd, rest := args[0], args[1], args[2:]
