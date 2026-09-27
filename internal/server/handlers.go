@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 
 	"github.com/ayberkgezer/gocolorlog"
 	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/command"
@@ -58,12 +59,42 @@ func (s *Server) handleListTopics(p *packet.Packet) {
 	}
 	s.mu.RUnlock()
 
-	dataBytes, _ := json.Marshal(response.ListTopicsData{Topics: topicList})
+	if err := s.sendSuccess(outFifo, commands.CmdListTopics, response.ListTopicsData{Topics: topicList}); err != nil {
+		gocolorlog.Errorf("error sending list topics response: %v", err)
+	}
+}
 
-	resp := response.Response{
+func (s *Server) sendSuccess(w io.Writer, cmd uint8, data any) error {
+	var dataBytes []byte
+	var err error
+
+	if data != nil {
+		dataBytes, err = json.Marshal(data)
+		if err != nil {
+			s.sendError(w, cmd, response.GeneralError, "internal server error")
+			return err
+		}
+	}
+
+	r := response.Response{
 		Code: response.NoError,
 		Data: dataBytes,
 	}
 
-	packet.WritePacket(outFifo, commands.CmdListTopics, resp)
+	rBytes, err := json.Marshal(r)
+	if err != nil {
+		s.sendError(w, cmd, response.GeneralError, "internal server error")
+		return err
+	}
+
+	return packet.WritePacket(w, cmd, rBytes)
+}
+
+func (s *Server) sendError(w io.Writer, cmd uint8, code uint8, msg string) {
+	r := response.Response{
+		Code:     code,
+		ErrorMsg: msg,
+	}
+	rBytes, _ := json.Marshal(r)
+	_ = packet.WritePacket(w, cmd, rBytes)
 }
