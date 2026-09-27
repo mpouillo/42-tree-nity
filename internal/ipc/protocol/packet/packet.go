@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -24,27 +25,46 @@ type Packet struct {
 	Payload []byte
 }
 
-func ReadPacket(r io.Reader) (*Packet, error) {
-	var header PacketHeader
-
-	if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-		return nil, err
+func ReadPacket(ctx context.Context, r io.Reader) (*Packet, error) {
+	type result struct {
+		packet *Packet
+		err    error
 	}
 
-	if header.Magic != MagicByte {
-		return nil, errors.New("invalid protocol magic byte")
-	}
+	ch := make(chan result, 1)
 
-	if header.PayloadLength > MaxPayloadSize {
-		return nil, fmt.Errorf("payload length %d exceeds max allowed size", header.PayloadLength)
-	}
+	go func() {
+		var header PacketHeader
+		if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
+			ch <- result{nil, err}
+			return
+		}
 
-	payload := make([]byte, header.PayloadLength)
-	if _, err := io.ReadFull(r, payload); err != nil {
-		return nil, err
-	}
+		if header.Magic != MagicByte {
+			ch <- result{nil, errors.New("invalid protocol magic byte")}
+			return
+		}
 
-	return &Packet{header, payload}, nil
+		if header.PayloadLength > MaxPayloadSize {
+			ch <- result{nil, fmt.Errorf("payload length %d exceeds max allowed size %d", header.PayloadLength, MaxPayloadSize)}
+			return
+		}
+
+		payload := make([]byte, header.PayloadLength)
+		if _, err := io.ReadFull(r, payload); err != nil {
+			ch <- result{nil, err}
+			return
+		}
+
+		ch <- result{&Packet{Header: header, Payload: payload}, nil}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		return res.packet, res.err
+	}
 }
 
 func WritePacket(w io.Writer, command uint8, payload []byte) error {
