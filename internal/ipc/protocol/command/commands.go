@@ -36,7 +36,7 @@ type InfoClient struct {
 type Produce struct {
 	IPCPath string
 	Topic   string
-	Message string
+	Message []byte
 	Raw     bool
 }
 
@@ -64,7 +64,9 @@ func NewProduce(packet packet.Packet) (*Produce, error) {
 		return nil, errors.New("invalid packet command type")
 	}
 	var p Produce
-	json.Unmarshal(packet.Payload, &p)
+	if err := json.Unmarshal(packet.Payload, &p); err != nil{
+		return nil, err
+	}
 	if length := len(p.Message); length > 1024 {
 		return nil, fmt.Errorf("packet length %d exceeds max allowed size", length)
 	}
