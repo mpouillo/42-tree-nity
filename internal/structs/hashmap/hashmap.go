@@ -18,8 +18,8 @@ type Hashmap struct {
 	elements    []bucket
 }
 
-func NewHashMap() Hashmap {
-	return Hashmap{
+func NewHashMap() *Hashmap {
+	return &Hashmap{
 		nb_inserted: 0,
 		elements:    make([]bucket, base_hashmap_size),
 	}
