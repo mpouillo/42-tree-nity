@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
+
 	"github.com/ayberkgezer/gocolorlog"
+	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
 type ClientCommand struct {
-	ipc  string
-	args []string
+	serverEndpoint *fifo.Fifo
+	args           []string
+	context        context.Context
 }
 
 func checkNbArgs(max int, args []string) {

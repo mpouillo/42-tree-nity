@@ -1,11 +1,26 @@
 package main
 
 import (
+	"context"
 	"os"
-	"fmt"
+	"os/signal"
+	"syscall"
+
 	"github.com/ayberkgezer/gocolorlog"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
+	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
+
+
+func connectToEndpoint(ipc string) *fifo.Fifo{
+	f, err := fifo.Open(ipc, fifo.Write)
+	if err != nil {
+		gocolorlog.Errorf("failed to connect to endpoint: %v", err)
+		os.Exit(int(response.GeneralError))
+	}
+	return f
+}
+
 
 func main() {
 	args := os.Args[1:]
@@ -14,7 +29,15 @@ func main() {
 		os.Exit(int(response.GeneralError))
 	}
 	ipc, cmd, rest := args[0], args[1], args[2:]
-	command := ClientCommand{ipc: ipc, args: rest}
+
+	serverEndpoint := connectToEndpoint(ipc)
+	defer serverEndpoint.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	
+	command := ClientCommand{serverEndpoint: serverEndpoint, args: rest, context: ctx}
+
+
 	switch cmd {
 	case "create":
 		cmdCreate(command)
