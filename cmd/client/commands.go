@@ -45,24 +45,23 @@ func checkNbArgs(nbArgsNeeded int, args []string) bool {
 	return len(args) == nbArgsNeeded
 }
 
-func cmdList(command ClientCommandInfo) int {
+func cmdList(clientCommand ClientCommandInfo) int {
+	return int(response.NoError)
+}
+func cmdInfo(clientCommand ClientCommandInfo) int {
 	return int(response.NoError)
 
 }
-func cmdInfo(command ClientCommandInfo) int {
-	return int(response.NoError)
-
-}
-func cmdCreate(command ClientCommandInfo) int {
+func cmdCreate(clientCommand ClientCommandInfo) int {
 	return int(response.NoError)
 }
 
-func cmdProduce(command ClientCommandInfo) int {
+func cmdProduce(clientCommand ClientCommandInfo) int {
 	return int(response.NoError)
 
 }
 
-func cmdSubscribe(command ClientCommandInfo) int {
+func cmdSubscribe(clientCommand ClientCommandInfo) int {
 	return int(response.NoError)
 
 }
