@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 
+	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/command"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
+
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
@@ -46,6 +49,11 @@ func checkNbArgs(nbArgsNeeded int, args []string) bool {
 }
 
 func cmdList(clientCommand ClientCommandInfo) int {
+
+	err := packet.WritePacket(clientCommand.serverEndpoint, commands.CmdListTopics)
+	if err != nil {
+		return int(response.GeneralError)
+	}
 	return int(response.NoError)
 }
 func cmdInfo(clientCommand ClientCommandInfo) int {

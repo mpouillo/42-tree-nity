@@ -8,17 +8,8 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
-	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
-)
 
-func connectToEndpoint(ipc string) *fifo.Fifo {
-	f, err := fifo.Open(ipc, fifo.Write)
-	if err != nil {
-		log.Errorf("failed to connect to endpoint: %v", err)
-		os.Exit(int(response.GeneralError))
-	}
-	return f
-}
+)
 
 func main() {
 	os.Exit(run())
@@ -32,7 +23,10 @@ func run() int {
 	}
 	ipc, cmdName, rest := args[0], args[1], args[2:]
 
-	serverEndpoint := connectToEndpoint(ipc)
+	serverEndpoint, errCode := connectToEndpoint(ipc)
+	if errCode != 0 {
+		return errCode
+	}
 	defer func() { _ = serverEndpoint.Close() }()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
