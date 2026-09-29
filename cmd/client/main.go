@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ayberkgezer/gocolorlog"
+	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
@@ -14,7 +14,7 @@ import (
 func connectToEndpoint(ipc string) *fifo.Fifo {
 	f, err := fifo.Open(ipc, fifo.Write)
 	if err != nil {
-		gocolorlog.Errorf("failed to connect to endpoint: %v", err)
+		log.Errorf("failed to connect to endpoint: %v", err)
 		os.Exit(int(response.GeneralError))
 	}
 	return f
@@ -27,7 +27,7 @@ func main() {
 func run() int {
 	args := os.Args[1:]
 	if len(args) < 2 {
-		gocolorlog.Errorf("usage: client <ipc> <command> [args]")
+		log.Errorf("usage: client <ipc> <command> [args]")
 		return int(response.GeneralError)
 	}
 	ipc, cmdName, rest := args[0], args[1], args[2:]
@@ -42,11 +42,11 @@ func run() int {
 
 	cmd, ok := commandList[cmdName]
 	if !ok {
-		gocolorlog.Errorf("unknown command %s\n", cmdName)
+		log.Errorf("unknown command %s", cmdName)
 		return int(response.GeneralError)
 	}
 	if !checkNbArgs(cmd.nbArgs, commandInfo.args) {
-		gocolorlog.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
+		log.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
 		return int(response.GeneralError)
 	}
 	return cmd.run(commandInfo)
