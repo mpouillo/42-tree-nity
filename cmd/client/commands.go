@@ -3,39 +3,69 @@ package main
 import (
 	"context"
 
-	"github.com/ayberkgezer/gocolorlog"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
-type ClientCommand struct {
+type ClientCommandInfo struct {
 	serverEndpoint *fifo.Fifo
 	args           []string
 	context        context.Context
 }
 
-func checkNbArgs(max int, args []string) {
+type Command struct {
+	nbArgs int
+	run    func(ClientCommandInfo) int
+}
+
+var commandList = map[string]Command{
+	"list": {
+		nbArgs: 0,
+		run:    cmdList,
+	},
+	"info": {
+		nbArgs: 1,
+		run:    cmdInfo,
+	},
+	"create": {
+		nbArgs: 1,
+		run:    cmdCreate,
+	},
+	"produce": {
+		nbArgs: 1,
+		run:    cmdProduce,
+	},
+	"subscribe": {
+		nbArgs: 2,
+		run:    cmdSubscribe,
+	},
+}
+
+func checkNbArgs(max int, args []string) bool {
 	if len(args) != max {
-		gocolorlog.Errorf("too much args for create command\n")
+		return false
 	}
+	return true
 }
 
-func cmdCreate(command ClientCommand) {
-	checkNbArgs(1, command.args)
+func cmdList(command ClientCommandInfo) int {
+	return int(response.NoError)
+
+}
+func cmdInfo(command ClientCommandInfo) int {
+	return int(response.NoError)
+
+}
+func cmdCreate(command ClientCommandInfo) int {
+	return int(response.NoError)
+}
+
+func cmdProduce(command ClientCommandInfo) int {
+	return int(response.NoError)
 
 }
 
-func cmdList(command ClientCommand) {
-	checkNbArgs(0, command.args)
-}
+func cmdSubscribe(command ClientCommandInfo) int {
+	return int(response.NoError)
 
-func cmdProduce(command ClientCommand) {
-	checkNbArgs(1, command.args)
-}
-
-func cmdSubscribe(command ClientCommand) {
-	checkNbArgs(2, command.args)
-}
-
-func cmdInfo(command ClientCommand) {
-	checkNbArgs(1, command.args)
 }

@@ -23,34 +23,32 @@ func connectToEndpoint(ipc string) *fifo.Fifo{
 
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	args := os.Args[1:]
 	if len(args) < 2 {
 		gocolorlog.Errorf("usage: client <ipc> <command> [args]")
-		os.Exit(int(response.GeneralError))
+		return int(response.GeneralError)
 	}
-	ipc, cmd, rest := args[0], args[1], args[2:]
+	ipc, cmdName, rest := args[0], args[1], args[2:]
 
 	serverEndpoint := connectToEndpoint(ipc)
 	defer serverEndpoint.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	
-	command := ClientCommand{serverEndpoint: serverEndpoint, args: rest, context: ctx}
+	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, args: rest, context: ctx}
 
-
-	switch cmd {
-	case "create":
-		cmdCreate(command)
-	case "list":
-		cmdList(command)
-	case "produce":
-		cmdProduce(command)
-	case "subscribe":
-		cmdSubscribe(command)
-	case "info":
-		cmdInfo(command)
-	default:
-		gocolorlog.Errorf("unknown command %q\n", cmd)
-		os.Exit(int(response.GeneralError))
+	cmd, ok := commandList[cmdName]
+	if !ok{
+		gocolorlog.Errorf("unknown command %s\n", cmdName)
+		return int(response.GeneralError)
 	}
+	if !checkNbArgs(cmd.nbArgs, commandInfo.args){
+		gocolorlog.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
+		return int(response.GeneralError)
+	}
+	return cmd.run(commandInfo)
 }
