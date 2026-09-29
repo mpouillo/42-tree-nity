@@ -41,11 +41,8 @@ var commandList = map[string]Command{
 	},
 }
 
-func checkNbArgs(max int, args []string) bool {
-	if len(args) != max {
-		return false
-	}
-	return true
+func checkNbArgs(nbArgsNeeded int, args []string) bool {
+	return len(args) == nbArgsNeeded
 }
 
 func cmdList(command ClientCommandInfo) int {
