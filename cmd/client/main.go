@@ -11,8 +11,7 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
-
-func connectToEndpoint(ipc string) *fifo.Fifo{
+func connectToEndpoint(ipc string) *fifo.Fifo {
 	f, err := fifo.Open(ipc, fifo.Write)
 	if err != nil {
 		gocolorlog.Errorf("failed to connect to endpoint: %v", err)
@@ -20,7 +19,6 @@ func connectToEndpoint(ipc string) *fifo.Fifo{
 	}
 	return f
 }
-
 
 func main() {
 	os.Exit(run())
@@ -35,18 +33,19 @@ func run() int {
 	ipc, cmdName, rest := args[0], args[1], args[2:]
 
 	serverEndpoint := connectToEndpoint(ipc)
-	defer serverEndpoint.Close()
+	defer func() { _ = serverEndpoint.Close() }()
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	
+
 	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, args: rest, context: ctx}
 
 	cmd, ok := commandList[cmdName]
-	if !ok{
+	if !ok {
 		gocolorlog.Errorf("unknown command %s\n", cmdName)
 		return int(response.GeneralError)
 	}
-	if !checkNbArgs(cmd.nbArgs, commandInfo.args){
+	if !checkNbArgs(cmd.nbArgs, commandInfo.args) {
 		gocolorlog.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
 		return int(response.GeneralError)
 	}
