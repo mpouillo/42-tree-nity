@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
-
 )
 
 func main() {
@@ -24,7 +24,7 @@ func run() int {
 	ipc, cmdName, rest := args[0], args[1], args[2:]
 
 	serverEndpoint, errCode := connectToEndpoint(ipc)
-	if errCode != 0 {
+	if errCode != int(response.NoError) {
 		return errCode
 	}
 	defer func() { _ = serverEndpoint.Close() }()
@@ -43,5 +43,23 @@ func run() int {
 		log.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
 		return int(response.GeneralError)
 	}
+
+	var responseFifoName string
+	if cmdName == "subscribe" {
+		responseFifoName = fmt.Sprintf("%s", ipc)
+	} else {
+		responseFifoName = ipc
+	}
+	responseFifo, errCode := CreateResponseFifo(ipc)
+	if errCode != int(response.NoError) {
+		return errCode
+	}
+	defer func() { _ = responseFifo.Close() }()
+	responseFifoReader, errCode := OpenResponseFifo(ipc)
+	if errCode != int(response.NoError) {
+		return errCode
+	}
+	defer func() { _ = responseFifoReader.Close() }()
+	
 	return cmd.run(commandInfo)
 }
