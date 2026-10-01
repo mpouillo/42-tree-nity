@@ -49,10 +49,9 @@ func checkNbArgs(nbArgsNeeded int, args []string) bool {
 }
 
 func cmdList(clientCommand ClientCommandInfo) int {
-
 	err := packet.WritePacket(clientCommand.serverEndpoint, commands.CmdListTopics)
 	if err != nil {
-		return int(response.GeneralError)
+			return int(response.GeneralError)
 	}
 	return int(response.NoError)
 }
