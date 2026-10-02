@@ -20,32 +20,33 @@ const (
 )
 
 type CreateTopic struct {
-	IPCPath string
-	Topic   string
+	IPCPath string `kong:"-"`
+	Topic   string `arg:""`
 }
 
 type ListTopics struct {
-	IPCPath string
+	IPCPath string `kong:"-"`
 }
 
 type InfoClient struct {
-	IPCPath string
-	Client  string
+	IPCPath string `kong:"-"`
+	Client  string `arg:""`
 }
 
 type Produce struct {
-	IPCPath string
-	Topic   string
-	Message []byte
-	Raw     bool
+	IPCPath string `kong:"-"`
+	Topic   string `arg:""`
+	Message []byte `kong:"-"`
+	Raw     bool   `json:"-"`
 }
 
 type Subscribe struct {
-	IPCPath string
-	Client  string
-	Topic   string
+	IPCPath string `kong:"-"`
+	Topic   string `arg:""` // Topic before Client for kong arg order
+	Client  string `arg:""`
 	Prefix  string
-	Offset  uint32
+	Offset  *uint32 `json:",omitempty"` // nil = no offset specified and else the pointer is used
+	Raw     bool    `json:"-"`
 }
 
 type AckOffset struct {
@@ -64,7 +65,7 @@ func NewProduce(packet packet.Packet) (*Produce, error) {
 		return nil, errors.New("invalid packet command type")
 	}
 	var p Produce
-	if err := json.Unmarshal(packet.Payload, &p); err != nil{
+	if err := json.Unmarshal(packet.Payload, &p); err != nil {
 		return nil, err
 	}
 	if length := len(p.Message); length > 1024 {
