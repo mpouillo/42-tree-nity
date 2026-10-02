@@ -3,6 +3,7 @@ module github.com/mpouillo/42-tree-nity
 go 1.27.1
 
 require (
+	github.com/alecthomas/kong v1.16.1
 	github.com/charmbracelet/log v1.0.0
 	github.com/stretchr/testify v1.12.1 // direct
 )

@@ -45,5 +45,5 @@ func (cli *CLI) validate(cmdName string) int {
 		}
 		return check("client", cli.IPC.Subscribe.Client)
 	}
-	return int(response.GeneralError)
+	return int(response.NoError)
 }

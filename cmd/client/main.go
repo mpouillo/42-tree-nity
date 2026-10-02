@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/alecthomas/kong"
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
@@ -15,14 +16,37 @@ func main() {
 	os.Exit(run())
 }
 
+func responseFifoPath(ipc, cmdName string, cli *CLI) string {
+	if cmdName == "subscribe" {
+		return ipc + "." + cli.IPC.Subscribe.Client
+	}
+
+	return fmt.Sprintf("%s.%d", ipc, os.Getpid())
+}
+
 func run() int {
-	args := os.Args[1:]
-	if len(args) < 2 {
-		log.Errorf("usage: client <ipc> <command> [args]")
+	var cli CLI
+	parser, err := kong.New(&cli, kong.NoDefaultHelp())
+	if err != nil {
+		panic(err)
+	}
+	parsed, err := parser.Parse(os.Args[1:])
+	if err != nil {
+		log.Errorf("%v", err)
 		return int(response.GeneralError)
 	}
-	ipc, cmdName, rest := args[0], args[1], args[2:]
 
+	cmdName := parsed.Selected().Name
+	cmd, ok := commandList[cmdName]
+	if !ok { // just in case but should not happen
+		log.Errorf("unknown command %s", cmdName)
+		return int(response.GeneralError)
+	}
+	if errCode := cli.validate(cmdName); errCode != int(response.NoError) {
+		return errCode
+	}
+
+	ipc := cli.IPC.IPC
 	serverEndpoint, errCode := connectToEndpoint(ipc)
 	if errCode != int(response.NoError) {
 		return errCode
@@ -32,34 +56,19 @@ func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, args: rest, context: ctx}
+	responseFifoPath := responseFifoPath(ipc, cmdName, &cli)
+	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, cli: &cli, context: ctx, responseFifoPath: responseFifoPath}
 
-	cmd, ok := commandList[cmdName]
-	if !ok {
-		log.Errorf("unknown command %s", cmdName)
-		return int(response.GeneralError)
-	}
-	if !checkNbArgs(cmd.nbArgs, commandInfo.args) {
-		log.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
-		return int(response.GeneralError)
-	}
-
-	var responseFifoName string
-	if cmdName == "subscribe" {
-		responseFifoName = fmt.Sprintf("%s", ipc)
-	} else {
-		responseFifoName = ipc
-	}
-	responseFifo, errCode := CreateResponseFifo(ipc)
+	responseFifo, errCode := CreateResponseFifo(responseFifoPath)
 	if errCode != int(response.NoError) {
 		return errCode
 	}
 	defer func() { _ = responseFifo.Close() }()
-	responseFifoReader, errCode := OpenResponseFifo(ipc)
+	responseFifoReader, errCode := OpenResponseFifo(responseFifoPath)
 	if errCode != int(response.NoError) {
 		return errCode
 	}
 	defer func() { _ = responseFifoReader.Close() }()
-	
+
 	return cmd.run(commandInfo)
 }
