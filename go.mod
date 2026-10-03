@@ -4,6 +4,7 @@ go 1.27.1
 
 require (
 	github.com/alecthomas/kong v1.16.1
+	github.com/ayberkgezer/gocolorlog v1.3.0
 	github.com/charmbracelet/log v1.0.0
 	github.com/stretchr/testify v1.12.1 // direct
 )
