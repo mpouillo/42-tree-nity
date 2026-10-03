@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+
 	"github.com/charmbracelet/log"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
-
 
 func connectToEndpoint(ipc string) (*fifo.Fifo, int) {
 	f, err := fifo.Open(ipc, fifo.Write)
@@ -32,4 +36,44 @@ func OpenResponseFifo(ipc string) (*fifo.Fifo, int) {
 		return nil, int(response.GeneralError)
 	}
 	return f, int(response.NoError)
+}
+
+func SendCommand( commandInfo *ClientCommandInfo, cmd uint8, request any) int {
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return int(response.GeneralError)
+	}
+	if err := packet.WritePacket(commandInfo.serverEndpoint, cmd, payload); err != nil {
+		return int(response.IpcError)
+	}
+	return int(response.NoError)
+}
+
+func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int) {
+	pkt, err := packet.ReadPacket(ctx, fifo)
+	if errors.Is(err, context.Canceled) {
+		return nil, int(response.NoError)
+	}
+	if err != nil {
+		log.Errorf("read response: %v", err)
+		return nil, int(response.IpcError)
+	}
+ 
+	var resp response.Response
+	if err := json.Unmarshal(pkt.Payload, &resp); err != nil {
+		log.Errorf("decode response: %v", err)
+		return nil, int(response.IpcError)
+	}
+ 
+	if resp.Code != response.NoError {
+		log.Errorf("%s", resp.ErrorMsg)
+		return nil, int(resp.Code)
+	}
+	return &resp, int(response.NoError)
+}
+
+func GetResponse(c ClientCommandInfo) (*response.Response, int) {
+	resp, code := ReadResponse(c.context, c.responseFifoReader)
+	_ = c.responseFifo.Close()
+	return resp, code
 }
