@@ -1,37 +1,37 @@
 package hashmap
 
-type entry struct {
+type entry[T any] struct {
 	key   string
-	value any
+	value T
 }
 
-type bucket struct {
-	entries []entry
+type bucket[T any] struct {
+	entries []entry[T]
 }
 
-func (bucket *bucket) append(key string, value any) {
-	bucket.entries = append(bucket.entries, entry{key, value})
+func (bucket *bucket[T]) append(key string, value T) {
+	bucket.entries = append(bucket.entries, entry[T]{key, value})
 }
 
-type Hashmap struct {
+type Hashmap[T any] struct {
 	nb_inserted uint64
-	elements    []bucket
+	elements    []bucket[T]
 }
 
-func NewHashMap() *Hashmap {
-	return &Hashmap{
+func NewHashMap[T any]() *Hashmap[T] {
+	return &Hashmap[T]{
 		nb_inserted: 0,
-		elements:    make([]bucket, base_hashmap_size),
+		elements:    make([]bucket[T], base_hashmap_size),
 	}
 }
 
-func (hashmap *Hashmap) cap() uint64 {
+func (hashmap *Hashmap[T]) cap() uint64 {
 	return uint64(cap(hashmap.elements))
 }
 
-func (hashmap *Hashmap) resize() {
+func (hashmap *Hashmap[T]) resize() {
 	new_size := hashmap.cap() * 2
-	new_elements := make([]bucket, new_size)
+	new_elements := make([]bucket[T], new_size)
 	for _, bucket := range hashmap.elements {
 		for _, entry := range bucket.entries {
 			new_index := hash(entry.key, new_size)
@@ -41,7 +41,7 @@ func (hashmap *Hashmap) resize() {
 	hashmap.elements = new_elements
 }
 
-func (hashmap *Hashmap) Insert(key string, value any) {
+func (hashmap *Hashmap[T]) Insert(key string, value T) {
 	var index = hash(key, hashmap.cap())
 	for i := range hashmap.elements[index].entries {
 		if hashmap.elements[index].entries[i].key == key {
@@ -61,7 +61,7 @@ func (hashmap *Hashmap) Insert(key string, value any) {
 	hashmap.elements[index].append(key, value)
 }
 
-func (hashmap *Hashmap) Get(key string) (any, error) {
+func (hashmap *Hashmap[T]) Get(key string) (any, error) {
 	index := hash(key, hashmap.cap())
 	for _, entry := range hashmap.elements[index].entries {
 		if entry.key == key {

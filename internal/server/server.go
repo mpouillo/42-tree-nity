@@ -8,18 +8,20 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 	"github.com/mpouillo/42-tree-nity/internal/structs/hashmap"
 	"github.com/mpouillo/42-tree-nity/internal/topic"
+
+	"github.com/mpouillo/42-tree-nity/internal/consumer"
 )
 
 type Server struct {
 	mu      sync.RWMutex
 	topics  map[string]*topic.Topic
-	clients *hashmap.Hashmap
+	clients *hashmap.Hashmap[consumer.Consumer]
 }
 
 func NewServer() *Server {
 	return &Server{
 		topics:  make(map[string]*topic.Topic),
-		clients: hashmap.NewHashMap(),
+		clients: hashmap.NewHashMap[consumer.Consumer](),
 	}
 }
 
