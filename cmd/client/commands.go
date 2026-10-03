@@ -32,24 +32,41 @@ var commandList = map[string]Command{
 	"subscribe": {run: cmdSubscribe},
 }
 
-func cmdList(commandInfo ClientCommandInfo) int {
-	request := commandInfo.cli.IPC.List
-	request.IPCPath = commandInfo.responseFifoReader.Path()
-
-	if errCode := SendCommand(&commandInfo, commands.CmdListTopics, request); errCode != int(response.NoError) {
-		return errCode
+func dialogWithServer(commandInfo ClientCommandInfo, cmd uint8, request any) (*response.Response, int) {
+	if errCode := SendCommand(&commandInfo, cmd, request); errCode != int(response.NoError) {
+		return nil, errCode
 	}
 
 	resp, errCode := GetResponse(commandInfo)
 	if resp == nil {
-		return errCode
+		return nil, errCode
 	}
 
-	var data response.ListTopicsData
+	return resp, int(response.NoError)
+}
+
+func unmarshallResponse[T any](resp *response.Response) (T, int) {
+	var data T
 	err := json.Unmarshal(resp.Data, &data)
 	if err != nil {
 		log.Errorf("failed to unmarshal: %v", err)
-		return int(response.GeneralError)
+		return *new(T), int(response.GeneralError)
+	}
+	return data, int(response.NoError)
+}
+
+func cmdList(commandInfo ClientCommandInfo) int {
+	request := commandInfo.cli.IPC.List
+	request.IPCPath = commandInfo.responseFifoReader.Path()
+
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdListTopics, request)
+	if resp == nil {
+		return errCode
+	}
+
+	data, errCode := unmarshallResponse[response.ListTopicsData](resp)
+	if errCode != int(response.NoError) {
+		return errCode
 	}
 	fmt.Println(strings.Join(data.Topics, ","))
 
@@ -60,20 +77,14 @@ func cmdInfo(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Info
 	request.IPCPath = commandInfo.responseFifoReader.Path()
 
-	if errCode := SendCommand(&commandInfo, commands.CmdInfoClient, request); errCode != int(response.NoError) {
-		return errCode
-	}
-
-	resp, errCode := GetResponse(commandInfo)
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdInfoClient, request)
 	if resp == nil {
 		return errCode
 	}
 
-	var data response.InfoClientData
-	err := json.Unmarshal(resp.Data, &data)
-	if err != nil {
-		log.Errorf("failed to unmarshal: %v", err)
-		return int(response.GeneralError)
+	_, errCode = unmarshallResponse[response.InfoClientData](resp)
+	if errCode != int(response.NoError) {
+		return errCode
 	}
 	fmt.Println(string(resp.Data))
 
@@ -84,11 +95,7 @@ func cmdCreate(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Create
 	request.IPCPath = commandInfo.responseFifoReader.Path()
 
-	if errCode := SendCommand(&commandInfo, commands.CmdCreateTopic, request); errCode != int(response.NoError) {
-		return errCode
-	}
-
-	resp, errCode := GetResponse(commandInfo)
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdCreateTopic, request)
 	if resp == nil {
 		return errCode
 	}
