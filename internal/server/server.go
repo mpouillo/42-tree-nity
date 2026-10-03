@@ -27,6 +27,9 @@ func (s *Server) Serve(ctx context.Context, fifo *fifo.Fifo) error {
 	for {
 		p, err := packet.ReadPacket(ctx, fifo)
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return err
 		}
 		s.handleCommand(ctx, p)
