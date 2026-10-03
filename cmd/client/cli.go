@@ -3,7 +3,7 @@ package main
 import (
 	"regexp"
 
-	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/command"
+	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )

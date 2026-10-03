@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/command"
+	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
