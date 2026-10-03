@@ -40,7 +40,6 @@ func cmdList(commandInfo ClientCommandInfo) int {
 		return errCode
 	}
 
-
 	resp, errCode := GetResponse(commandInfo)
 	if resp == nil {
 		return errCode
@@ -60,7 +59,24 @@ func cmdList(commandInfo ClientCommandInfo) int {
 func cmdInfo(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Info
 	request.IPCPath = commandInfo.responseFifoReader.Path()
-	_ = request
+
+	if errCode := SendCommand(&commandInfo, commands.CmdInfoClient, request); errCode != int(response.NoError) {
+		return errCode
+	}
+
+	resp, errCode := GetResponse(commandInfo)
+	if resp == nil {
+		return errCode
+	}
+
+	var data response.InfoClientData
+	err := json.Unmarshal(resp.Data, &data)
+	if err != nil {
+		log.Errorf("failed to unmarshal: %v", err)
+		return int(response.GeneralError)
+	}
+	fmt.Println(string(resp.Data))
+
 	return int(response.NoError)
 }
 
@@ -68,11 +84,9 @@ func cmdCreate(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Create
 	request.IPCPath = commandInfo.responseFifoReader.Path()
 
-
 	if errCode := SendCommand(&commandInfo, commands.CmdCreateTopic, request); errCode != int(response.NoError) {
 		return errCode
 	}
-
 
 	resp, errCode := GetResponse(commandInfo)
 	if resp == nil {
