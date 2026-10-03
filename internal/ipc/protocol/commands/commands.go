@@ -1,13 +1,5 @@
 package commands
 
-import (
-	"encoding/json"
-	"errors"
-	"fmt"
-
-	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
-)
-
 const (
 	CmdNone        uint8 = 0 // No Command
 	CmdCreateTopic uint8 = 1 // Manager: Create topic
@@ -58,19 +50,4 @@ type AckOffset struct {
 type Disconnect struct {
 	IPCPath string
 	Client  string
-}
-
-func NewProduce(packet packet.Packet) (*Produce, error) {
-	if packet.Header.Command != CmdProduce {
-		return nil, errors.New("invalid packet command type")
-	}
-	var p Produce
-	if err := json.Unmarshal(packet.Payload, &p); err != nil {
-		return nil, err
-	}
-	if length := len(p.Message); length > 1024 {
-		return nil, fmt.Errorf("packet length %d exceeds max allowed size", length)
-	}
-
-	return &p, nil
 }
