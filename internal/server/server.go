@@ -29,6 +29,6 @@ func (s *Server) Serve(ctx context.Context, fifo *fifo.Fifo) error {
 		if err != nil {
 			return err
 		}
-		s.handleCommand(p)
+		s.handleCommand(ctx, p)
 	}
 }
