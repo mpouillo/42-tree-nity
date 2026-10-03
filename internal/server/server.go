@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
@@ -24,6 +25,7 @@ func NewServer() *Server {
 }
 
 func (s *Server) Serve(ctx context.Context, fifo *fifo.Fifo) error {
+	fmt.Printf("%s\n", fifo.Path())
 	for {
 		p, err := packet.ReadPacket(ctx, fifo)
 		if err != nil {
