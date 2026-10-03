@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewHashMap(t *testing.T) {
-	hm := NewHashMap()
+	hm := NewHashMap[int]()
 
 	if hm.nb_inserted != 0 {
 		t.Fatalf("expected nb_inserted = 0, got %d", hm.nb_inserted)
@@ -19,7 +19,7 @@ func TestNewHashMap(t *testing.T) {
 }
 
 func TestCap(t *testing.T) {
-	hm := NewHashMap()
+	hm := NewHashMap[uint64]()
 	if int(hm.cap()) != cap(hm.elements) {
 		t.Fatalf("cap is not equal to cap(hm.elements), expected %d, got %d", cap(hm.elements), hm.cap())
 	}
@@ -27,7 +27,7 @@ func TestCap(t *testing.T) {
 
 func TestResize(t *testing.T) {
 	t.Run("check capacity", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 
 		cap := hm.cap()
 		hm.resize()
@@ -40,7 +40,7 @@ func TestResize(t *testing.T) {
 	})
 
 	t.Run("check good index", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 
 		key := "hello"
 		value := uint64(1)
@@ -55,7 +55,7 @@ func TestResize(t *testing.T) {
 	})
 
 	t.Run("check bad index", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 
 		key := "hello"
 		index := hash(key, hm.cap())
@@ -72,7 +72,7 @@ func TestResize(t *testing.T) {
 
 func TestInsert(t *testing.T) {
 	t.Run("check basic insert", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 
 		hm.Insert("hello", 1)
 		index := hash("hello", hm.cap())
@@ -83,7 +83,7 @@ func TestInsert(t *testing.T) {
 		}
 	})
 	t.Run("check insert with same key", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 		hm.Insert("hello", 1)
 		hm.Insert("hello", 2)
 		index := hash("hello", hm.cap())
@@ -94,7 +94,7 @@ func TestInsert(t *testing.T) {
 		}
 	})
 	t.Run("check double capacity", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 		cap := hm.cap()
 		for i := 0; i < 12; i++ {
 			hm.Insert(fmt.Sprintf("key_%d", i), uint64(i))
@@ -107,25 +107,25 @@ func TestInsert(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	t.Run("check basic get", func(t *testing.T) {
-		hm := NewHashMap()
-		hm.Insert("hello", 1)
+		hm := NewHashMap[uint64]()
+		hm.Insert("hello", uint64(1))
 		val, err := hm.Get("hello")
 		if err != nil {
 			t.Fatalf("expected no error for key 'hello', got error: %v", err)
 		}
-		if val != 1 {
+		if val != uint64(1) {
 			t.Fatalf("expected value 1 for key 'hello', got %d", val)
 		}
 	})
 	t.Run("check get not found", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 		val, err := hm.Get("hello")
 		if err == nil {
 			t.Fatalf("expected error for missing key in empty map, got val=%d", val)
 		}
 	})
 	t.Run("check good error", func(t *testing.T) {
-		hm := NewHashMap()
+		hm := NewHashMap[uint64]()
 		_, err := hm.Get("hello")
 		if !errors.Is(err, ErrKeyNotFound) {
 			t.Fatalf("expected error 'key not found', got '%v'", err)
