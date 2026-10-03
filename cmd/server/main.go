@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,14 +30,15 @@ func main() {
 	if err != nil {
 		gocolorlog.Fatalf("failed to create fifo: %v\n", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	srv := server.NewServer()
+	err = srv.Serve(ctx, f)
 
-	if err := srv.Serve(ctx, f); err != nil {
-		gocolorlog.Fatalf("server error: %v", err)
-	}
+	if err != nil && !errors.Is(err, context.Canceled) && ctx.Err() == nil {
+        gocolorlog.Fatalf("server error: %v", err)
+    }
 }
