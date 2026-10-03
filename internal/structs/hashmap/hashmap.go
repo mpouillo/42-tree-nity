@@ -61,12 +61,12 @@ func (hashmap *Hashmap[T]) Insert(key string, value T) {
 	hashmap.elements[index].append(key, value)
 }
 
-func (hashmap *Hashmap[T]) Get(key string) (any, error) {
+func (hashmap *Hashmap[T]) Get(key string) (T, error) {
 	index := hash(key, hashmap.cap())
 	for _, entry := range hashmap.elements[index].entries {
 		if entry.key == key {
 			return entry.value, nil
 		}
 	}
-	return nil, ErrKeyNotFound
+	return *new(T), ErrKeyNotFound
 }
