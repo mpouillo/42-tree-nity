@@ -67,7 +67,18 @@ func cmdInfo(commandInfo ClientCommandInfo) int {
 func cmdCreate(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Create
 	request.IPCPath = commandInfo.responseFifoReader.Path()
-	_ = request
+
+
+	if errCode := SendCommand(&commandInfo, commands.CmdCreateTopic, request); errCode != int(response.NoError) {
+		return errCode
+	}
+
+
+	resp, errCode := GetResponse(commandInfo)
+	if resp == nil {
+		return errCode
+	}
+
 	return int(response.NoError)
 }
 
