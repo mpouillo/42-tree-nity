@@ -56,18 +56,19 @@ func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	responseFifoPath := responseFifoPath(ipc, cmdName, &cli)
-	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, cli: &cli, context: ctx, responseFifoPath: responseFifoPath}
+	responsePath := responseFifoPath(ipc, cmdName, &cli)
 
-	responseFifo, errCode := CreateResponseFifo(responseFifoPath)
+	responseFifo, errCode := CreateResponseFifo(responsePath)
 	if errCode != int(response.NoError) {
 		return errCode
 	}
 	defer func() { _ = responseFifo.Close() }()
-	responseFifoReader, errCode := OpenResponseFifo(responseFifoPath)
+	responseFifoReader, errCode := OpenResponseFifo(responsePath)
 	if errCode != int(response.NoError) {
 		return errCode
 	}
+	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, cli: &cli, context: ctx,
+		responseFifo: responseFifo, responseFifoReader: responseFifoReader}
 	defer func() { _ = responseFifoReader.Close() }()
 
 	return cmd.run(commandInfo)
