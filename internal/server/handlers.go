@@ -7,7 +7,7 @@ import (
 	"io"
 
 	"github.com/ayberkgezer/gocolorlog"
-	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/command"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
@@ -62,7 +62,7 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 		gocolorlog.Errorf("error creating response fifo: %v", err)
 		return
 	}
-	defer outFifo.Close()
+	defer func(){ _ = outFifo.Close() }()
 
 	s.mu.Lock()
 	if _, exists := s.topics[payload.Topic]; exists {
@@ -89,7 +89,7 @@ func (s *Server) handleListTopics(p *packet.Packet) {
 		gocolorlog.Errorf("error creating response fifo: %v", err)
 		return
 	}
-	defer outFifo.Close()
+	defer func(){ _ = outFifo.Close() }()
 
 	s.mu.RLock()
 	topicList := make([]string, 0, len(s.topics))
