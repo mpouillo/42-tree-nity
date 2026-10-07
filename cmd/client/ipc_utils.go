@@ -38,7 +38,7 @@ func OpenResponseFifo(ipc string) (*fifo.Fifo, int) {
 	return f, int(response.NoError)
 }
 
-func SendCommand( commandInfo *ClientCommandInfo, cmd uint8, request any) int {
+func SendCommand(commandInfo *ClientCommandInfo, cmd uint8, request any) int {
 	payload, err := json.Marshal(request)
 	if err != nil {
 		return int(response.GeneralError)
@@ -58,13 +58,13 @@ func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int
 		log.Errorf("read response: %v", err)
 		return nil, int(response.IpcError)
 	}
- 
+
 	var resp response.Response
 	if err := json.Unmarshal(pkt.Payload, &resp); err != nil {
 		log.Errorf("decode response: %v", err)
 		return nil, int(response.IpcError)
 	}
- 
+
 	if resp.Code != response.NoError {
 		log.Errorf("%s", resp.ErrorMsg)
 		return nil, int(resp.Code)
@@ -72,8 +72,34 @@ func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int
 	return &resp, int(response.NoError)
 }
 
-func GetResponse(c ClientCommandInfo) (*response.Response, int) {
+func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.Response, int) {
 	resp, code := ReadResponse(c.context, c.responseFifoReader)
-	_ = c.responseFifo.Close()
+	if stopNewConnectionsAfter {
+		_ = c.responseFifo.Close()
+	}
 	return resp, code
+}
+
+
+func dialogWithServer(commandInfo ClientCommandInfo, cmd uint8, request any, stopNewConnectionsAfter bool) (*response.Response, int) {
+	if errCode := SendCommand(&commandInfo, cmd, request); errCode != int(response.NoError) {
+		return nil, errCode
+	}
+
+	resp, errCode := GetResponse(commandInfo, stopNewConnectionsAfter)
+	if resp == nil {
+		return nil, errCode
+	}
+
+	return resp, int(response.NoError)
+}
+
+func unmarshallResponse[T any](resp *response.Response) (T, int) {
+	var data T
+	err := json.Unmarshal(resp.Data, &data)
+	if err != nil {
+		log.Errorf("failed to unmarshal: %v", err)
+		return *new(T), int(response.GeneralError)
+	}
+	return data, int(response.NoError)
 }
