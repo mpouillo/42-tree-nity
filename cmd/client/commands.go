@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"slices"
 
 	"github.com/charmbracelet/log"
 	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
@@ -32,34 +33,11 @@ var commandList = map[string]Command{
 	"subscribe": {run: cmdSubscribe},
 }
 
-func dialogWithServer(commandInfo ClientCommandInfo, cmd uint8, request any) (*response.Response, int) {
-	if errCode := SendCommand(&commandInfo, cmd, request); errCode != int(response.NoError) {
-		return nil, errCode
-	}
-
-	resp, errCode := GetResponse(commandInfo)
-	if resp == nil {
-		return nil, errCode
-	}
-
-	return resp, int(response.NoError)
-}
-
-func unmarshallResponse[T any](resp *response.Response) (T, int) {
-	var data T
-	err := json.Unmarshal(resp.Data, &data)
-	if err != nil {
-		log.Errorf("failed to unmarshal: %v", err)
-		return *new(T), int(response.GeneralError)
-	}
-	return data, int(response.NoError)
-}
-
 func cmdList(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.List
 	request.IPCPath = commandInfo.responseFifoReader.Path()
 
-	resp, errCode := dialogWithServer(commandInfo, commands.CmdListTopics, request)
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdListTopics, request, true)
 	if resp == nil {
 		return errCode
 	}
@@ -77,7 +55,7 @@ func cmdInfo(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Info
 	request.IPCPath = commandInfo.responseFifoReader.Path()
 
-	resp, errCode := dialogWithServer(commandInfo, commands.CmdInfoClient, request)
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdInfoClient, request, true)
 	if resp == nil {
 		return errCode
 	}
@@ -95,7 +73,7 @@ func cmdCreate(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Create
 	request.IPCPath = commandInfo.responseFifoReader.Path()
 
-	resp, errCode := dialogWithServer(commandInfo, commands.CmdCreateTopic, request)
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdCreateTopic, request, true)
 	if resp == nil {
 		return errCode
 	}
@@ -104,9 +82,34 @@ func cmdCreate(commandInfo ClientCommandInfo) int {
 }
 
 func cmdProduce(commandInfo ClientCommandInfo) int {
+	listRequest := commandInfo.cli.IPC.List
 	request := commandInfo.cli.IPC.Produce
+	listRequest.IPCPath = commandInfo.responseFifoReader.Path()
 	request.IPCPath = commandInfo.responseFifoReader.Path()
-	_ = request
+
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdListTopics, listRequest, false)
+	if resp == nil {
+		return errCode
+	}
+
+	data, errCode := unmarshallResponse[response.ListTopicsData](resp)
+	if errCode != int(response.NoError) {
+		return errCode
+	}
+
+	if !slices.Contains(data.Topics, request.Topic) {
+		return int(response.TopicError)
+	}
+
+	// for {
+		 
+	// 	resp, errCode := dialogWithServer(commandInfo, commands.CmdProduce, request, false)
+	// 	if resp == nil {
+	// 		return errCode
+	// 	}
+		
+	// }
+	
 	return int(response.NoError)
 }
 
