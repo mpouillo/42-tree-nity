@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"strings"
+	"io"
+	"os"
 	"slices"
+	"strings"
 
 	"github.com/charmbracelet/log"
 	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
@@ -22,6 +24,7 @@ type ClientCommandInfo struct {
 }
 
 type Command struct {
+
 	run func(ClientCommandInfo) int
 }
 
@@ -98,19 +101,31 @@ func cmdProduce(commandInfo ClientCommandInfo) int {
 	}
 
 	if !slices.Contains(data.Topics, request.Topic) {
+		log.Errorf("topic %q does not exist", request.Topic)
 		return int(response.TopicError)
 	}
 
-	// for {
-		 
-	// 	resp, errCode := dialogWithServer(commandInfo, commands.CmdProduce, request, false)
-	// 	if resp == nil {
-	// 		return errCode
-	// 	}
-		
-	// }
-	
-	return int(response.NoError)
+	messageChannel:= readMessages(os.Stdin, request.Raw)
+	for {
+		select {
+		case <-commandInfo.context.Done():
+			return int(response.NoError)
+		case message := <-messageChannel:
+			if errors.Is(message.err, io.EOF) {
+				return int(response.NoError)
+			}
+			if message.err != nil {
+				log.Errorf("failed to read message: %v", message.err)
+				return int(response.GeneralError)
+			}
+
+			request.Message = message.msg.ToRaw()
+			resp, errCode := dialogWithServer(commandInfo, commands.CmdProduce, request, false)
+			if resp == nil {
+				return errCode
+			}
+		}
+	}
 }
 
 func cmdSubscribe(commandInfo ClientCommandInfo) int {
