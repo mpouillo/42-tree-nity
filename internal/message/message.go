@@ -5,9 +5,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 )
 
+// max size of key+body
+const MaxSize = 1024
+
 var ErrInvalidMessage = errors.New("error parsing message from raw byte value")
+var ErrTooLarge = fmt.Errorf("message exceeds %d bytes (key+body)", MaxSize)
 
 type Message struct {
 	Key    string
@@ -33,38 +38,57 @@ func FromSeparator(msg []byte, sep string) *Message {
 	}
 }
 
-func FromRaw(msg []byte) (*Message, error) {
-	offset := 0
+// reads one message [keysize:int32][key][valuesize:int32][value]
+func ReadRaw(r io.Reader) (*Message, error) {
+	var size [4]byte
 
-	if len(msg)-offset < 4 {
-		return nil, fmt.Errorf("%w: missing key size header", ErrInvalidMessage)
+	if _, err := io.ReadFull(r, size[:]); err != nil {
+		return nil, err
 	}
-	keysize := int(binary.LittleEndian.Uint32(msg[offset : offset+4]))
-	offset += 4
+	keySize := binary.LittleEndian.Uint32(size[:])
+	if keySize > MaxSize {
+		return nil, ErrTooLarge
+	}
+	key := make([]byte, keySize)
+	if err := readFull(r, key); err != nil {
+		return nil, err
+	}
 
-	if len(msg)-offset < keysize {
-		return nil, fmt.Errorf("%w: truncated key bytes", ErrInvalidMessage)
+	if err := readFull(r, size[:]); err != nil {
+		return nil, err
 	}
-	key := string(msg[offset : offset+keysize])
-	offset += keysize
-
-	if len(msg)-offset < 4 {
-		return nil, fmt.Errorf("%w: missing body size header", ErrInvalidMessage)
+	bodySize := binary.LittleEndian.Uint32(size[:])
+	if bodySize > MaxSize-keySize {
+		return nil, ErrTooLarge
 	}
-	bodysize := int(binary.LittleEndian.Uint32(msg[offset : offset+4]))
-	offset += 4
-
-	if len(msg)-offset < bodysize {
-		return nil, fmt.Errorf("%w: truncated body bytes", ErrInvalidMessage)
+	body := make([]byte, bodySize)
+	if err := readFull(r, body); err != nil {
+		return nil, err
 	}
-	body := bytes.Clone(msg[offset : offset+bodysize])
 
 	return &Message{
-		Key:    key,
+		Key:    string(key),
 		Body:   body,
 		Offset: 0,
 		Raw:    true,
 	}, nil
+}
+
+// does the same as io.readFull but an EOF is considered an error
+func readFull(r io.Reader, buf []byte) error {
+	_, err := io.ReadFull(r, buf)
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	return err
+}
+
+func FromRaw(msg []byte) (*Message, error) {
+	m, err := ReadRaw(bytes.NewReader(msg))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
+	}
+	return m, nil
 }
 
 func (m *Message) ToRaw() []byte {
