@@ -18,7 +18,7 @@ import (
 type ClientCommandInfo struct {
 	serverEndpoint     *fifo.Fifo
 	cli                *CLI
-	context            context.Context
+ 	context            context.Context
 	responseFifo       *fifo.Fifo
 	responseFifoReader *fifo.Fifo
 }
@@ -80,6 +80,8 @@ func cmdCreate(commandInfo ClientCommandInfo) int {
 	if resp == nil {
 		return errCode
 	}
+
+	fmt.Println("topic created")
 
 	return int(response.NoError)
 }
