@@ -3,9 +3,12 @@ package packet
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
 const (
@@ -93,4 +96,36 @@ func WritePacket(w io.Writer, command uint8, payload []byte) error {
 	}
 
 	return nil
+}
+
+func WriteResponse(w io.Writer, cmd uint8, code uint8, errorMsg string, data any) error {
+	var dataBytes []byte
+	var err error
+
+	if data != nil {
+		switch v := data.(type) {
+		case []byte:
+			dataBytes = v
+		case json.RawMessage:
+			dataBytes = v
+		default:
+			dataBytes, err = json.Marshal(data)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	res := response.Response{
+		Code:     code,
+		ErrorMsg: errorMsg,
+		Data:     dataBytes,
+	}
+
+	resBytes, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+
+	return WritePacket(w, cmd, resBytes)
 }
