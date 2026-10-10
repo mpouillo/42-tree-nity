@@ -109,8 +109,7 @@ func (t *Topic) Subscribe(c *consumer.Consumer) error {
 	for _, msg := range t.messages {
 		if msg.Offset >= currentOffset {
 			if c.Prefix == "" || strings.HasPrefix(string(msg.Key), c.Prefix) {
-				_, err := c.Deliver(msg)
-				if err != nil {
+				if err := c.Deliver(msg); err != nil {
 					return err
 				}
 				c.Offset.Store(msg.Offset + 1)
@@ -164,10 +163,9 @@ func (t *Topic) processAndDispatch(msg message.TopicMessage) {
 
 	for _, c := range subscribers {
 		if msg.Offset >= c.Offset.Load() {
-			_, err := c.Deliver(msg)
-			if err != nil {
-				// consumer pipe is broken or disconnected
+			if err := c.Deliver(msg); err != nil {
 				t.Unsubscribe(c.ID)
+				// TODO: notify server to remove client from hashmap
 				continue
 			}
 			c.Offset.Store(msg.Offset + 1)
