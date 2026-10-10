@@ -15,16 +15,17 @@ var ErrDuplicateClient = errors.New("client already exists")
 var ErrTopicClosed = errors.New("topic is closed")
 
 type Topic struct {
-	Name       string
-	mu         sync.RWMutex
-	messages   []message.TopicMessage
-	nextOffset uint32
-	prefixTrie *trie.Trie[*consumer.Consumer]
-	consumers  map[string]*consumer.Consumer
-	msgChan    chan message.TopicMessage
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
+	Name         string
+	mu           sync.RWMutex
+	messages     []message.TopicMessage
+	nextOffset   uint32
+	prefixTrie   *trie.Trie[*consumer.Consumer]
+	consumers    map[string]*consumer.Consumer
+	msgChan      chan message.TopicMessage
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
+	onDisconnect func(clientID string)
 }
 
 func NewTopic(parentCtx context.Context, name string) *Topic {
@@ -165,7 +166,9 @@ func (t *Topic) processAndDispatch(msg message.TopicMessage) {
 		if msg.Offset >= c.Offset.Load() {
 			if err := c.Deliver(msg); err != nil {
 				t.Unsubscribe(c.ID)
-				// TODO: notify server to remove client from hashmap
+				if t.onDisconnect != nil {
+					t.onDisconnect(c.ID)
+				}
 				continue
 			}
 			c.Offset.Store(msg.Offset + 1)
@@ -183,7 +186,9 @@ func (t *Topic) drainAndFlush() {
 	defer t.mu.Unlock()
 
 	for id, c := range t.consumers {
-		// remember to send error code 3 here when implemented
+		if t.onDisconnect != nil {
+			t.onDisconnect(c.ID)
+		}
 		_ = c.CloseIPCChannel()
 		delete(t.consumers, id)
 	}
