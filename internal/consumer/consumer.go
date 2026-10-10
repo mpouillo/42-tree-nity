@@ -3,6 +3,9 @@ package consumer
 import (
 	"sync/atomic"
 
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	message "github.com/mpouillo/42-tree-nity/internal/message"
 	fifo "github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
@@ -31,12 +34,13 @@ func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Cons
 	return c, nil
 }
 
-func (c *Consumer) Deliver(msg message.TopicMessage) (int, error) {
+func (c *Consumer) Deliver(msg message.TopicMessage) error {
 	if c == nil || c.Fifo == nil {
-		return 0, nil
+		return nil
 	}
 
-	return c.Fifo.Write(msg.ToRaw())
+	data := msg.ToRaw()
+	return packet.WriteResponse(c.Fifo, commands.CmdSubscribe, response.NoError, "", data)
 }
 
 func (c *Consumer) CloseIPCChannel() error {
