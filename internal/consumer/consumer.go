@@ -1,7 +1,6 @@
 package consumer
 
 import (
-	"encoding/binary"
 	"sync/atomic"
 
 	message "github.com/mpouillo/42-tree-nity/internal/message"
@@ -32,21 +31,12 @@ func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Cons
 	return c, nil
 }
 
-func (c *Consumer) Deliver(msg message.Message) (int, error) {
+func (c *Consumer) Deliver(msg message.TopicMessage) (int, error) {
 	if c == nil || c.Fifo == nil {
 		return 0, nil
 	}
 
-	var contents []byte
-
-	if msg.Raw {
-		contents = binary.LittleEndian.AppendUint32(nil, msg.Offset)
-		contents = append(contents, msg.ToRaw()...)
-	} else {
-		contents = msg.ToSeparator(":")
-	}
-
-	return c.Fifo.Write(contents)
+	return c.Fifo.Write(msg.ToRaw())
 }
 
 func (c *Consumer) CloseIPCChannel() error {
