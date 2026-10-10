@@ -17,11 +17,11 @@ var ErrTopicClosed = errors.New("topic is closed")
 type Topic struct {
 	Name       string
 	mu         sync.RWMutex
-	messages   []message.Message
+	messages   []message.TopicMessage
 	nextOffset uint32
 	prefixTrie *trie.Trie[*consumer.Consumer]
 	consumers  map[string]*consumer.Consumer
-	msgChan    chan message.Message
+	msgChan    chan message.TopicMessage
 	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
@@ -32,11 +32,11 @@ func NewTopic(parentCtx context.Context, name string) *Topic {
 
 	t := &Topic{
 		Name:       name,
-		messages:   make([]message.Message, 0),
+		messages:   make([]message.TopicMessage, 0),
 		nextOffset: 0,
 		prefixTrie: trie.NewTrie[*consumer.Consumer](),
 		consumers:  make(map[string]*consumer.Consumer),
-		msgChan:    make(chan message.Message, 1024),
+		msgChan:    make(chan message.TopicMessage, 1024),
 		ctx:        ctx,
 		cancel:     cancel,
 	}
@@ -66,7 +66,7 @@ func (t *Topic) Close() error {
 	return nil
 }
 
-func (t *Topic) Produce(key string, body []byte) (uint32, error) {
+func (t *Topic) Produce(key []byte, body []byte) (uint32, error) {
 	if t.ctx.Err() != nil {
 		return 0, ErrTopicClosed
 	}
@@ -75,7 +75,7 @@ func (t *Topic) Produce(key string, body []byte) (uint32, error) {
 	offset := t.nextOffset
 	t.nextOffset++
 
-	msg := message.Message{
+	msg := message.TopicMessage{
 		Key:    key,
 		Body:   body,
 		Offset: offset,
@@ -108,7 +108,7 @@ func (t *Topic) Subscribe(c *consumer.Consumer) error {
 	currentOffset := c.Offset.Load()
 	for _, msg := range t.messages {
 		if msg.Offset >= currentOffset {
-			if c.Prefix == "" || strings.HasPrefix(msg.Key, c.Prefix) {
+			if c.Prefix == "" || strings.HasPrefix(string(msg.Key), c.Prefix) {
 				_, err := c.Deliver(msg)
 				if err != nil {
 					return err
@@ -159,8 +159,8 @@ func (t *Topic) MatchConsumers(key string) []*consumer.Consumer {
 	return matched
 }
 
-func (t *Topic) processAndDispatch(msg message.Message) {
-	subscribers := t.MatchConsumers(msg.Key)
+func (t *Topic) processAndDispatch(msg message.TopicMessage) {
+	subscribers := t.MatchConsumers(string(msg.Key))
 
 	for _, c := range subscribers {
 		if msg.Offset >= c.Offset.Load() {

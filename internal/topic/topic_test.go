@@ -42,14 +42,14 @@ func TestProduce(t *testing.T) {
 			ctx := context.Background()
 			topic := NewTopic(ctx, "test")
 
-			offset, err := topic.Produce(tt.key, []byte(tt.body))
+			offset, err := topic.Produce([]byte(tt.key), []byte(tt.body))
 			require.NoError(t, err)
 			assert.Equal(t, uint32(0), offset)
 
 			topic.mu.RLock()
 
 			require.Len(t, topic.messages, 1)
-			assert.Equal(t, tt.key, topic.messages[0].Key)
+			assert.Equal(t, []byte(tt.key), topic.messages[0].Key)
 			assert.Equal(t, []byte(tt.body), topic.messages[0].Body)
 			assert.Equal(t, uint32(0), topic.messages[0].Offset)
 
@@ -63,15 +63,15 @@ func TestProduce_SequentialOffsets(t *testing.T) {
 	ctx := context.Background()
 	topic := NewTopic(ctx, "test")
 
-	o1, err := topic.Produce("k1", []byte("v1"))
+	o1, err := topic.Produce([]byte("k1"), []byte("v1"))
 	require.NoError(t, err)
 	assert.Equal(t, uint32(0), o1)
 
-	o2, err := topic.Produce("k2", []byte("v2"))
+	o2, err := topic.Produce([]byte("k2"), []byte("v2"))
 	require.NoError(t, err)
 	assert.Equal(t, uint32(1), o2)
 
-	o3, err := topic.Produce("k3", []byte("v3"))
+	o3, err := topic.Produce([]byte("k3"), []byte("v3"))
 	require.NoError(t, err)
 	assert.Equal(t, uint32(2), o3)
 
@@ -84,7 +84,7 @@ func TestProduce_AfterClose(t *testing.T) {
 
 	require.NoError(t, topic.Close())
 
-	_, err := topic.Produce("user.update", []byte("payload"))
+	_, err := topic.Produce([]byte("user.update"), []byte("payload"))
 	assert.ErrorIs(t, err, ErrTopicClosed)
 }
 
@@ -158,7 +158,7 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	topic := NewTopic(ctx, "test")
 
 	// 1. Produce historical message before subscription
-	_, err := topic.Produce("user.login", []byte("historical"))
+	_, err := topic.Produce([]byte("user.login"), []byte("historical"))
 	require.NoError(t, err)
 
 	// 2. Subscribe consumer
@@ -169,7 +169,7 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// 3. Produce live message after subscription
-	_, err = topic.Produce("user.logout", []byte("live"))
+	_, err = topic.Produce([]byte("user.logout"), []byte("live"))
 	require.NoError(t, err)
 
 	// Give background dispatch loop a brief moment to write to the pipe

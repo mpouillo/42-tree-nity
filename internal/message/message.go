@@ -15,27 +15,21 @@ var ErrInvalidMessage = errors.New("error parsing message from raw byte value")
 var ErrTooLarge = fmt.Errorf("message exceeds %d bytes (key+body)", MaxSize)
 
 type Message struct {
-	Key    string
+	Key    []byte
 	Body   []byte
-	Offset uint32
-	Raw    bool
 }
 
-func FromSeparator(msg []byte, sep string) *Message {
-	key, body, found := bytes.Cut(msg, []byte(sep))
+type TopicMessage struct {
+	Message
+	Offset uint32
+}
 
-	if !found {
-		body = []byte{}
-	} else {
-		body = bytes.Clone(body)
+func FromRaw(msg []byte) (*Message, error) {
+	m, err := ReadRaw(bytes.NewReader(msg))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
 	}
-
-	return &Message{
-		Key:    string(key),
-		Body:   body,
-		Offset: 0,
-		Raw:    false,
-	}
+	return m, nil
 }
 
 // reads one message [keysize:int32][key][valuesize:int32][value]
@@ -67,10 +61,8 @@ func ReadRaw(r io.Reader) (*Message, error) {
 	}
 
 	return &Message{
-		Key:    string(key),
+		Key:    key,
 		Body:   body,
-		Offset: 0,
-		Raw:    true,
 	}, nil
 }
 
@@ -83,16 +75,25 @@ func readFull(r io.Reader, buf []byte) error {
 	return err
 }
 
-func FromRaw(msg []byte) (*Message, error) {
-	m, err := ReadRaw(bytes.NewReader(msg))
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
+func FromSeparator(msg []byte, sep string) *Message {
+	key, body, found := bytes.Cut(msg, []byte(sep))
+
+	if !found {
+		body = []byte{}
+	} else {
+		body = bytes.Clone(body)
 	}
-	return m, nil
+
+	return &Message{
+		Key:    key,
+		Body:   body,
+	}
 }
 
-func (m *Message) ToRaw() []byte {
-	buf := make([]byte, 0, 4+len(m.Key)+4+len(m.Body))
+// [offset:int32][keysize:int32][key:bytes][valuesize:int32][value:bytes]
+func (m *TopicMessage) ToRaw() []byte {
+	buf := make([]byte, 0, 4+4+len(m.Key)+4+len(m.Body))
+	buf = binary.LittleEndian.AppendUint32(buf, m.Offset)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Key)))
 	buf = append(buf, m.Key...)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Body)))
