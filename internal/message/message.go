@@ -17,6 +17,10 @@ var ErrTooLarge = fmt.Errorf("message exceeds %d bytes (key+body)", MaxSize)
 type Message struct {
 	Key    []byte
 	Body   []byte
+}
+
+type TopicMessage struct {
+	Message
 	Offset uint32
 }
 
@@ -59,7 +63,6 @@ func ReadRaw(r io.Reader) (*Message, error) {
 	return &Message{
 		Key:    key,
 		Body:   body,
-		Offset: 0,
 	}, nil
 }
 
@@ -84,12 +87,11 @@ func FromSeparator(msg []byte, sep string) *Message {
 	return &Message{
 		Key:    key,
 		Body:   body,
-		Offset: 0,
 	}
 }
 
 // [offset:int32][keysize:int32][key:bytes][valuesize:int32][value:bytes]
-func (m *Message) ToRaw() []byte {
+func (m *TopicMessage) ToRaw() []byte {
 	buf := make([]byte, 0, 4+4+len(m.Key)+4+len(m.Body))
 	buf = binary.LittleEndian.AppendUint32(buf, m.Offset)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Key)))
