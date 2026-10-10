@@ -89,7 +89,8 @@ func FromRaw(msg []byte) (*Message, error) {
 }
 
 func (m *Message) ToRaw() []byte {
-	buf := make([]byte, 0, 4+len(m.Key)+4+len(m.Body))
+	buf := make([]byte, 0, 4+4+len(m.Key)+4+len(m.Body))
+	buf = binary.LittleEndian.AppendUint32(buf, m.Offset)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Key)))
 	buf = append(buf, m.Key...)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(m.Body)))
