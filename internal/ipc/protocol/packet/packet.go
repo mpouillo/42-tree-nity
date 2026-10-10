@@ -75,26 +75,18 @@ func WritePacket(w io.Writer, command uint8, payload []byte) error {
 		return fmt.Errorf("payload size %d exceeds max allowed size %d", len(payload), MaxPayloadSize)
 	}
 
-	header := PacketHeader{
-		Magic:         MagicByte,
-		Command:       command,
-		PayloadLength: uint16(len(payload)),
-	}
+	buf := make([]byte, 0, HeaderSize+len(payload))
+	buf = append(buf, MagicByte, command)
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(len(payload)))
+	buf = append(buf, payload...)
 
-	if err := binary.Write(w, binary.LittleEndian, &header); err != nil {
+	n, err := w.Write(buf)
+	if err != nil {
 		return err
 	}
-
-	if len(payload) > 0 {
-		n, err := w.Write(payload)
-		if err != nil {
-			return err
-		}
-		if n < len(payload) {
-			return io.ErrShortWrite
-		}
+	if n < len(buf) {
+		return io.ErrShortWrite
 	}
-
 	return nil
 }
 
@@ -103,6 +95,7 @@ func WriteResponse(w io.Writer, cmd uint8, code uint8, errorMsg string, data any
 	var err error
 
 	if data != nil {
+
 		switch v := data.(type) {
 		case []byte:
 			dataBytes = v
