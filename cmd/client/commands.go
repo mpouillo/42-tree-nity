@@ -18,13 +18,12 @@ import (
 type ClientCommandInfo struct {
 	serverEndpoint     *fifo.Fifo
 	cli                *CLI
- 	context            context.Context
+	context            context.Context
 	responseFifo       *fifo.Fifo
 	responseFifoReader *fifo.Fifo
 }
 
 type Command struct {
-
 	run func(ClientCommandInfo) int
 }
 
@@ -133,7 +132,40 @@ func cmdProduce(commandInfo ClientCommandInfo) int {
 func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Subscribe
 	request.IPCPath = commandInfo.responseFifoReader.Path()
-	_ = request
-	_ = request.Raw
-	return int(response.NoError)
+	request.ConsumerPath = commandInfo.cli.IPC.IPC + "." + request.Client
+
+	consumerFifo, err := fifo.Create(request.ConsumerPath, fifo.ReadWrite)
+	if err != nil {
+		log.Errorf("failed to create consumer fifo: %v", err)
+		return int(response.GeneralError)
+	}
+	defer func() { _ = consumerFifo.Close() }()
+	resp, errCode := dialogWithServer(commandInfo, commands.CmdSubscribe, request, true)
+	if resp == nil {
+		return errCode
+	}
+	fmt.Printf("subscribed to %s\n", request.Topic)
+
+	defer SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{Client: request.Client})
+	for {
+			resp, errCode := ReadResponse(commandInfo.context, consumerFifo)
+			if resp == nil { 
+				return errCode
+			}
+			if len(resp.Data) == 0 { // server is shutting down
+				return int(response.NoError)
+			}
+			
+			data, errCode := unmarshallResponse[response.MessageData](resp)
+			if errCode != int(response.NoError) {
+				return errCode
+			}
+	
+			//handle raw and print here
+			ack := commands.AckOffset{Client: request.Client, Offset: data.Offset + 1}
+			if errCode := SendCommand(&commandInfo, commands.CmdAckOffset, ack); errCode != int(response.NoError) {
+				return errCode
+			}
+		}
+		
 }
