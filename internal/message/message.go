@@ -18,7 +18,6 @@ type Message struct {
 	Key    string
 	Body   []byte
 	Offset uint32
-	Raw    bool
 }
 
 func FromSeparator(msg []byte, sep string) *Message {
@@ -34,7 +33,6 @@ func FromSeparator(msg []byte, sep string) *Message {
 		Key:    string(key),
 		Body:   body,
 		Offset: 0,
-		Raw:    false,
 	}
 }
 
@@ -70,7 +68,6 @@ func ReadRaw(r io.Reader) (*Message, error) {
 		Key:    string(key),
 		Body:   body,
 		Offset: 0,
-		Raw:    true,
 	}, nil
 }
 
