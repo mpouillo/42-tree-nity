@@ -151,7 +151,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	}()
 	for {
 		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, consumerFifo)
-		if resp == nil { // signal received (code 0), or error (refused ack included)
+		if resp == nil {
 			return errCode
 		}
 
@@ -165,8 +165,18 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 			if errCode != int(response.NoError) {
 				return errCode
 			}
+			msg := data.Message
 
+			if request.Raw {
+				_, _ = os.Stdout.Write(msg.ToRaw())
+			} else {
+				fmt.Printf("%s\n", msg.ToSeparator(":"))
+			}
 
+			ack := commands.AckOffset{IPCPath: request.ConsumerPath, Client: request.Client, Offset: msg.Offset + 1}
+			if errCode := SendCommand(&commandInfo, commands.CmdAckOffset, ack); errCode != int(response.NoError) {
+				return errCode
+			}
 		default:
 			log.Errorf("unexpected command %d on consumer fifo", cmd)
 			return int(response.IpcError)
