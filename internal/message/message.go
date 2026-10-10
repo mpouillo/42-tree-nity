@@ -20,20 +20,12 @@ type Message struct {
 	Offset uint32
 }
 
-func FromSeparator(msg []byte, sep string) *Message {
-	key, body, found := bytes.Cut(msg, []byte(sep))
-
-	if !found {
-		body = []byte{}
-	} else {
-		body = bytes.Clone(body)
+func FromRaw(msg []byte) (*Message, error) {
+	m, err := ReadRaw(bytes.NewReader(msg))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
 	}
-
-	return &Message{
-		Key:    string(key),
-		Body:   body,
-		Offset: 0,
-	}
+	return m, nil
 }
 
 // reads one message [keysize:int32][key][valuesize:int32][value]
@@ -80,12 +72,20 @@ func readFull(r io.Reader, buf []byte) error {
 	return err
 }
 
-func FromRaw(msg []byte) (*Message, error) {
-	m, err := ReadRaw(bytes.NewReader(msg))
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
+func FromSeparator(msg []byte, sep string) *Message {
+	key, body, found := bytes.Cut(msg, []byte(sep))
+
+	if !found {
+		body = []byte{}
+	} else {
+		body = bytes.Clone(body)
 	}
-	return m, nil
+
+	return &Message{
+		Key:    string(key),
+		Body:   body,
+		Offset: 0,
+	}
 }
 
 func (m *Message) ToRaw() []byte {
