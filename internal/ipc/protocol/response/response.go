@@ -1,6 +1,10 @@
 package response
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/mpouillo/42-tree-nity/internal/message"
+)
 
 const (
 	NoError      uint8 = 0
@@ -22,7 +26,7 @@ type InfoClientData struct {
 }
 
 type SubscribeData struct {
-	Message string `json:"message"`
+	Message message.TopicMessage `json:"message"`
 }
 
 type Response struct {
