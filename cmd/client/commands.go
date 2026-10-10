@@ -146,26 +146,30 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	}
 	fmt.Printf("subscribed to %s\n", request.Topic)
 
-	defer SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{Client: request.Client})
+	defer func() {
+		_ = SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{Client: request.Client})
+	}()
 	for {
-			resp, errCode := ReadResponse(commandInfo.context, consumerFifo)
-			if resp == nil {
-				return errCode
-			}
-			if len(resp.Data) == 0 { // server is shutting down
-				return int(response.NoError)
-			}
-			
-			data, errCode := unmarshallResponse[response.MessageData](resp)
+		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, consumerFifo)
+		if resp == nil { // signal received (code 0), or error (refused ack included)
+			return errCode
+		}
+
+		switch cmd {
+		case commands.CmdDisconnect:
+			return int(response.NoError)
+		case commands.CmdAckOffset:
+			continue
+		case commands.CmdSubscribe:
+			data, errCode := unmarshallResponse[response.SubscribeData](resp)
 			if errCode != int(response.NoError) {
 				return errCode
 			}
-	
-			//handle raw and print here
-			ack := commands.AckOffset{Client: request.Client, Offset: data.Offset + 1}
-			if errCode := SendCommand(&commandInfo, commands.CmdAckOffset, ack); errCode != int(response.NoError) {
-				return errCode
-			}
+
+
+		default:
+			log.Errorf("unexpected command %d on consumer fifo", cmd)
+			return int(response.IpcError)
 		}
-		
+	}
 }
