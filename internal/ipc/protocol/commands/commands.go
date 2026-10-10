@@ -31,6 +31,7 @@ type Produce struct {
 	IPCPath string          `kong:"-"`
 	Topic   string          `arg:""`
 	Message message.Message `kong:"-"`
+	Raw     bool            `json:"-"`
 }
 
 // in order to avoid a problem when 2 clients with the same name subscribe, we have two
@@ -42,6 +43,7 @@ type Subscribe struct {
 	Client       string `arg:""`
 	Prefix       string
 	Offset       *uint32 `json:",omitempty"` // nil = no offset specified and else the pointer is used
+	Raw          bool    `json:"-"`
 }
 
 type AckOffset struct {
