@@ -106,7 +106,7 @@ func cmdProduce(commandInfo ClientCommandInfo) int {
 		return int(response.TopicError)
 	}
 
-	messageChannel:= readMessages(os.Stdin, request.Raw)
+	messageChannel := readMessages(os.Stdin, request.Raw)
 	for {
 		select {
 		case <-commandInfo.context.Done():
@@ -120,7 +120,7 @@ func cmdProduce(commandInfo ClientCommandInfo) int {
 				return int(response.GeneralError)
 			}
 
-			request.Message = message.msg.ToRaw()
+			request.Message = *message.msg
 			resp, errCode := dialogWithServer(commandInfo, commands.CmdProduce, request, false)
 			if resp == nil {
 				return errCode
@@ -149,7 +149,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	defer SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{Client: request.Client})
 	for {
 			resp, errCode := ReadResponse(commandInfo.context, consumerFifo)
-			if resp == nil { 
+			if resp == nil {
 				return errCode
 			}
 			if len(resp.Data) == 0 { // server is shutting down
