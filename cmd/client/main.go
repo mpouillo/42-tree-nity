@@ -17,10 +17,6 @@ func main() {
 }
 
 func responseFifoPath(ipc, cmdName string, cli *CLI) string {
-	if cmdName == "subscribe" {
-		return ipc + "." + cli.IPC.Subscribe.Client
-	}
-
 	return fmt.Sprintf("%s.%d", ipc, os.Getpid())
 }
 
