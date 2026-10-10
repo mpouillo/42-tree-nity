@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/charmbracelet/log"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
@@ -49,27 +50,33 @@ func SendCommand(commandInfo *ClientCommandInfo, cmd uint8, request any) int {
 	return int(response.NoError)
 }
 
-func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int) {
+// like ReadResponse, but also returns the command of the packet
+func ReadCommandResponse(ctx context.Context, fifo *fifo.Fifo) (uint8, *response.Response, int) {
 	pkt, err := packet.ReadPacket(ctx, fifo)
 	if errors.Is(err, context.Canceled) {
-		return nil, int(response.NoError)
+		return commands.CmdNone, nil, int(response.NoError)
 	}
 	if err != nil {
 		log.Errorf("read response: %v", err)
-		return nil, int(response.IpcError)
+		return commands.CmdNone, nil, int(response.IpcError)
 	}
 
 	var resp response.Response
 	if err := json.Unmarshal(pkt.Payload, &resp); err != nil {
 		log.Errorf("decode response: %v", err)
-		return nil, int(response.IpcError)
+		return commands.CmdNone, nil, int(response.IpcError)
 	}
 
 	if resp.Code != response.NoError {
 		log.Errorf("%s", resp.ErrorMsg)
-		return nil, int(resp.Code)
+		return commands.CmdNone, nil, int(resp.Code)
 	}
-	return &resp, int(response.NoError)
+	return pkt.Header.Command, &resp, int(response.NoError)
+}
+
+func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int) {
+	_, resp, errCode := ReadCommandResponse(ctx, fifo)
+	return resp, errCode
 }
 
 func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.Response, int) {
