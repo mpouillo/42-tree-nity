@@ -43,7 +43,7 @@ func TestFromSeparator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actual := FromSeparator([]byte(tt.input), ":")
-			expected := &Message{Key: tt.key, Body: []byte(tt.body), Offset: 0}
+			expected := &Message{Key: []byte(tt.key), Body: []byte(tt.body), Offset: 0}
 
 			assert.Equal(t, expected, actual)
 		})
@@ -85,10 +85,10 @@ func TestFromRaw(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg := encodeMessage(tt.key, tt.body)
+			msg := encodeMessageWithoutOffset(tt.key, tt.body)
 
 			actual, err := FromRaw(msg)
-			expected := &Message{Key: tt.key, Body: []byte(tt.body), Offset: 0}
+			expected := &Message{Key: []byte(tt.key), Body: []byte(tt.body), Offset: 0}
 
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
@@ -140,37 +140,70 @@ func TestToRaw(t *testing.T) {
 	}{
 		{
 			name: "empty message",
-			msg:  &Message{Key: "", Body: []byte(""), Offset: 0},
+			msg:  &Message{Key: []byte(""), Body: []byte(""), Offset: 0},
 		},
 		{
 			name: "regular message",
-			msg:  &Message{Key: "user.input", Body: []byte("hello, world!"), Offset: 0},
+			msg:  &Message{Key: []byte("user.input"), Body: []byte("hello, world!"), Offset: 0},
 		},
 		{
 			name: "empty key with body",
-			msg:  &Message{Key: "", Body: []byte("body payload"), Offset: 0},
+			msg:  &Message{Key: []byte(""), Body: []byte("body payload"), Offset: 0},
 		},
 		{
 			name: "key with empty body",
-			msg:  &Message{Key: "user.input", Body: []byte(""), Offset: 0},
+			msg:  &Message{Key: []byte("user.input"), Body: []byte(""), Offset: 0},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actualBytes := tt.msg.ToRaw()
-			expectedBytes := encodeMessage(tt.msg.Key, string(tt.msg.Body))
+			expectedBytes := encodeMessageWithOffset(string(tt.msg.Key), string(tt.msg.Body), tt.msg.Offset)
+
+			assert.Equal(t, expectedBytes, actualBytes)
+		})
+	}
+}
+
+func TestToSeparator(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  *Message
+	}{
+		{
+			name: "empty message",
+			msg:  &Message{Key: []byte(""), Body: []byte(""), Offset: 0},
+		},
+		{
+			name: "regular message",
+			msg:  &Message{Key: []byte("user.input"), Body: []byte("hello, world!"), Offset: 0},
+		},
+		{
+			name: "empty key with body",
+			msg:  &Message{Key: []byte(""), Body: []byte("body payload"), Offset: 0},
+		},
+		{
+			name: "key with empty body",
+			msg:  &Message{Key: []byte("user.input"), Body: []byte(""), Offset: 0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sep := ":"
+			actualBytes := tt.msg.ToSeparator(sep)
+			expectedBytes := []byte(string(tt.msg.Key) + ":" + string(tt.msg.Body))
 
 			assert.Equal(t, expectedBytes, actualBytes)
 
-			decodedMsg, err := FromRaw(actualBytes)
-			assert.NoError(t, err)
+			decodedMsg := FromSeparator(actualBytes, sep)
 			assert.Equal(t, tt.msg, decodedMsg)
 		})
 	}
 }
 
-func encodeMessage(key, body string) []byte {
+func encodeMessageWithoutOffset(key, body string) []byte {
 	buf := make([]byte, 0, 4+len(key)+4+len(body))
 
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(key)))
@@ -182,40 +215,15 @@ func encodeMessage(key, body string) []byte {
 	return buf
 }
 
+func encodeMessageWithOffset(key, body string, offset uint32) []byte {
+	buf := make([]byte, 0, 4+4+len(key)+4+len(body))
 
-func TestToSeparator(t *testing.T) {
-	tests := []struct {
-		name string
-		msg  *Message
-	}{
-		{
-			name: "empty message",
-			msg:  &Message{Key: "", Body: []byte(""), Offset: 0},
-		},
-		{
-			name: "regular message",
-			msg:  &Message{Key: "user.input", Body: []byte("hello, world!"), Offset: 0},
-		},
-		{
-			name: "empty key with body",
-			msg:  &Message{Key: "", Body: []byte("body payload"), Offset: 0},
-		},
-		{
-			name: "key with empty body",
-			msg:  &Message{Key: "user.input", Body: []byte(""), Offset: 0},
-		},
-	}
+	buf = binary.LittleEndian.AppendUint32(buf, offset)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(key)))
+	buf = append(buf, key...)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sep := ":"
-			actualBytes := tt.msg.ToSeparator(sep)
-			expectedBytes := []byte(tt.msg.Key + ":" + string(tt.msg.Body))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(body)))
+	buf = append(buf, body...)
 
-			assert.Equal(t, expectedBytes, actualBytes)
-
-			decodedMsg := FromSeparator(actualBytes, sep)
-			assert.Equal(t, tt.msg, decodedMsg)
-		})
-	}
+	return buf
 }

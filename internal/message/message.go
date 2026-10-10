@@ -15,7 +15,7 @@ var ErrInvalidMessage = errors.New("error parsing message from raw byte value")
 var ErrTooLarge = fmt.Errorf("message exceeds %d bytes (key+body)", MaxSize)
 
 type Message struct {
-	Key    string
+	Key    []byte
 	Body   []byte
 	Offset uint32
 }
@@ -57,7 +57,7 @@ func ReadRaw(r io.Reader) (*Message, error) {
 	}
 
 	return &Message{
-		Key:    string(key),
+		Key:    key,
 		Body:   body,
 		Offset: 0,
 	}, nil
@@ -82,12 +82,13 @@ func FromSeparator(msg []byte, sep string) *Message {
 	}
 
 	return &Message{
-		Key:    string(key),
+		Key:    key,
 		Body:   body,
 		Offset: 0,
 	}
 }
 
+// [offset:int32][keysize:int32][key:bytes][valuesize:int32][value:bytes]
 func (m *Message) ToRaw() []byte {
 	buf := make([]byte, 0, 4+4+len(m.Key)+4+len(m.Body))
 	buf = binary.LittleEndian.AppendUint32(buf, m.Offset)
