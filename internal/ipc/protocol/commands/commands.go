@@ -32,13 +32,16 @@ type Produce struct {
 	Raw     bool   `json:"-"`
 }
 
+// in order to avoid a problem when 2 clients with the same name subscribe, we have two
+// fifos for subscribe
 type Subscribe struct {
-	IPCPath string `kong:"-"`
-	Topic   string `arg:""` // Topic before Client for kong arg order
-	Client  string `arg:""`
-	Prefix  string
-	Offset  *uint32 `json:",omitempty"` // nil = no offset specified and else the pointer is used
-	Raw     bool    `json:"-"`
+	IPCPath      string `kong:"-"` // client checks if this is ok
+	ConsumerPath string `kong:"-"` // then it checks here for messages
+	Topic        string `arg:""`   // Topic before Client for kong arg order
+	Client       string `arg:""`
+	Prefix       string
+	Offset       *uint32 `json:",omitempty"` // nil = no offset specified and else the pointer is used
+	Raw          bool    `json:"-"`
 }
 
 type AckOffset struct {
