@@ -2,52 +2,78 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/ayberkgezer/gocolorlog"
+	"github.com/alecthomas/kong"
+	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
-	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
-
-func connectToEndpoint(ipc string) *fifo.Fifo {
-	f, err := fifo.Open(ipc, fifo.Write)
-	if err != nil {
-		gocolorlog.Errorf("failed to connect to endpoint: %v", err)
-		os.Exit(int(response.GeneralError))
-	}
-	return f
-}
 
 func main() {
 	os.Exit(run())
 }
 
+func pidFifoPath(ipc string) string {
+	return fmt.Sprintf("%s.@%d", ipc, os.Getpid())
+}
+
+// for subscribe, the fifo opened in run is the consumer fifo
+func responseFifoPath(ipc, cmdName string, cli *CLI) string {
+	if cmdName == "subscribe" {
+		return ipc + "." + cli.IPC.Subscribe.Client
+	}
+	return pidFifoPath(ipc)
+}
+
 func run() int {
-	args := os.Args[1:]
-	if len(args) < 2 {
-		gocolorlog.Errorf("usage: client <ipc> <command> [args]")
+	var cli CLI
+	parser, err := kong.New(&cli, kong.NoDefaultHelp())
+	if err != nil {
+		panic(err)
+	}
+	parsed, err := parser.Parse(os.Args[1:])
+	if err != nil {
+		log.Errorf("%v", err)
 		return int(response.GeneralError)
 	}
-	ipc, cmdName, rest := args[0], args[1], args[2:]
 
-	serverEndpoint := connectToEndpoint(ipc)
+	cmdName := parsed.Selected().Name
+	cmd, ok := commandList[cmdName]
+	if !ok { // just in case but should not happen
+		log.Errorf("unknown command %s", cmdName)
+		return int(response.GeneralError)
+	}
+	if errCode := cli.validate(cmdName); errCode != int(response.NoError) {
+		return errCode
+	}
+
+	ipc := cli.IPC.IPC
+	serverEndpoint, errCode := connectToEndpoint(ipc)
+	if errCode != int(response.NoError) {
+		return errCode
+	}
 	defer func() { _ = serverEndpoint.Close() }()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, args: rest, context: ctx}
+	responsePath := responseFifoPath(ipc, cmdName, &cli)
 
-	cmd, ok := commandList[cmdName]
-	if !ok {
-		gocolorlog.Errorf("unknown command %s\n", cmdName)
-		return int(response.GeneralError)
+	responseFifo, errCode := CreateResponseFifo(responsePath)
+	if errCode != int(response.NoError) {
+		return errCode
 	}
-	if !checkNbArgs(cmd.nbArgs, commandInfo.args) {
-		gocolorlog.Errorf("wrong number of args for %s command (expected %d)", cmdName, cmd.nbArgs)
-		return int(response.GeneralError)
+	defer func() { _ = responseFifo.Close() }()
+	responseFifoReader, errCode := OpenResponseFifo(responsePath)
+	if errCode != int(response.NoError) {
+		return errCode
 	}
+	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, cli: &cli, context: ctx,
+		responseFifo: responseFifo, responseFifoReader: responseFifoReader}
+	defer func() { _ = responseFifoReader.Close() }()
+
 	return cmd.run(commandInfo)
 }
