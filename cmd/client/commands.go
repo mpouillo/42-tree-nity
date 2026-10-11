@@ -131,23 +131,30 @@ func cmdProduce(commandInfo ClientCommandInfo) int {
 
 func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Subscribe
-	request.IPCPath = commandInfo.responseFifoReader.Path()
-	request.ConsumerPath = commandInfo.cli.IPC.IPC + "." + request.Client
+	consumerFifo := commandInfo.responseFifoReader
+	request.ConsumerPath = consumerFifo.Path()
 
-	consumerFifo, err := fifo.Create(request.ConsumerPath, fifo.ReadWrite)
-	if err != nil {
-		log.Errorf("failed to create consumer fifo: %v", err)
-		return int(response.GeneralError)
+	// pid fifo is used to handskake
+	pidFifo, errCode := CreateResponseFifo(pidFifoPath(commandInfo.cli.IPC.IPC))
+	if errCode != int(response.NoError) {
+		return errCode
 	}
-	defer func() { _ = consumerFifo.Close() }()
-	resp, errCode := dialogWithServer(commandInfo, commands.CmdSubscribe, request, true)
+	defer func() { _ = pidFifo.Close() }()
+	request.IPCPath = pidFifo.Path()
+	handshake := commandInfo
+	handshake.responseFifo = pidFifo
+	handshake.responseFifoReader = pidFifo
+	resp, errCode := dialogWithServer(handshake, commands.CmdSubscribe, request, true)
 	if resp == nil {
 		return errCode
 	}
 	fmt.Printf("subscribed to %s\n", request.Topic)
 
+	// close to get EOF err if the server closes
+	_ = commandInfo.responseFifo.Close()
+
 	defer func() {
-		_ = SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{Client: request.Client})
+		_ = SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{IPCPath: request.ConsumerPath, Client: request.Client})
 	}()
 	for {
 		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, consumerFifo)
