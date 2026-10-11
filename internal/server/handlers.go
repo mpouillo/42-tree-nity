@@ -13,6 +13,7 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
+	"github.com/mpouillo/42-tree-nity/internal/structs/hashmap"
 	"github.com/mpouillo/42-tree-nity/internal/topic"
 )
 
@@ -47,17 +48,17 @@ func (s *Server) handleCommand(ctx context.Context, p *packet.Packet) {
 }
 
 func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
-	f := func(payload *commands.CreateTopic) (any, error) {
+	f := func(payload *commands.CreateTopic) (any, error, uint8) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
 		if _, exists := s.topics[payload.Topic]; exists {
-			return nil, ErrDuplicateTopic
+			return nil, ErrDuplicateTopic, response.TopicError
 		}
 
 		newTopic, err := topic.NewTopic(ctx, payload.Topic)
 		if err != nil {
-			return nil, err
+			return nil, err, response.TopicError
 		}
 
 		newTopic.OnDisconnect = func(clientID string) {
@@ -70,14 +71,14 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 		}
 		s.topics[newTopic.Name] = newTopic
 
-		return []byte("topic created"), nil
+		return []byte("topic created"), nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdCreateTopic, f)
 }
 
 func (s *Server) handleListTopics(p *packet.Packet) {
-	f := func(payload *commands.ListTopics) (any, error) {
+	f := func(payload *commands.ListTopics) (any, error, uint8) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
 
@@ -86,20 +87,20 @@ func (s *Server) handleListTopics(p *packet.Packet) {
 			topicList = append(topicList, name)
 		}
 
-		return response.ListTopicsData{Topics: topicList}, nil
+		return response.ListTopicsData{Topics: topicList}, nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdListTopics, f)
 }
 
 func (s *Server) handleInfoClient(p *packet.Packet) {
-	f := func(payload *commands.InfoClient) (any, error) {
+	f := func(payload *commands.InfoClient) (any, error, uint8) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
 
 		clientInfo, err := s.clients.Get(payload.Client)
 		if err != nil {
-			return nil, fmt.Errorf("error getting client info: %v", err)
+			return nil, fmt.Errorf("error getting client info: %v", err), response.GeneralError
 		}
 
 		data := response.InfoClientData{
@@ -110,62 +111,70 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 			IPC:    clientInfo.Fifo.Path(),
 		}
 
-		return data, nil
+		return data, nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdInfoClient, f)
 }
 
 func (s *Server) handleProduce(p *packet.Packet) {
-	f := func(payload *commands.Produce) (any, error) {
+	f := func(payload *commands.Produce) (any, error, uint8) {
 		_, err := s.topics[payload.Topic].Produce(payload.Message.Key, payload.Message.Body)
 		if err != nil {
-			return nil, fmt.Errorf("error producing message: %v", err)
+			return nil, fmt.Errorf("error producing message: %v", err), response.GeneralError
 		}
 
-		return []byte("message produced successfully"), nil
+		return []byte("message produced successfully"), nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdProduce, f)
 }
 
 func (s *Server) handleSubscribe(p *packet.Packet) {
-	f := func(payload *commands.Subscribe) (any, error) {
+	f := func(payload *commands.Subscribe) (any, error, uint8) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
-		topic := s.topics[payload.Topic]
+		topic, exists := s.topics[payload.Topic]
+		if !exists {
+			s.sendError(payload.)
+			return nil, fmt.Errorf("topic does not exist"), response.TopicError
+		}
 
 		client, err := s.clients.Get(payload.Client)
-		if err != nil {
-			return nil, fmt.Errorf("error getting consumer data from database: %v", err)
+		if err != hashmap.ErrKeyNotFound {
+			return nil, fmt.Errorf("error getting consumer data from database: %v", err), response.GeneralError
 		}
 		if client == nil {
-			client, err = consumer.NewConsumer(payload.Client, payload.Topic, payload.Prefix, *payload.Offset, payload.ConsumerPath)
+			var offset uint32
+			if payload.Offset != nil {
+				offset = *payload.Offset
+			}
+			client, err = consumer.NewConsumer(payload.Client, payload.Topic, payload.Prefix, offset, payload.ConsumerPath)
 			if err != nil {
-				return nil, fmt.Errorf("error creating consumer: %v", err)
+				return nil, fmt.Errorf("error creating consumer: %v", err), response.GeneralError
 			}
 		}
 
 		if err := topic.Subscribe(client); err != nil {
-			return nil, fmt.Errorf("error subscribing consumer: %v", err)
+			return nil, fmt.Errorf("error subscribing consumer: %v", err), response.TopicError
 		}
 
 		s.clients.Insert(client.ID, client)
-		return []byte("subscription successful"), nil
+		return []byte("subscription successful"), nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdSubscribe, f)
 }
 
 func (s *Server) handleAckOffset(p *packet.Packet) {
-	f := func(payload *commands.AckOffset) (any, error) {
+	f := func(payload *commands.AckOffset) (any, error, uint8) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
 		client, err := s.clients.Get(payload.Client)
-		if err != nil {
-			return nil, fmt.Errorf("error getting consumer data from database: %v", err)
+		if err != hashmap.ErrKeyNotFound {
+			return nil, fmt.Errorf("error getting consumer data from database: %v", err), response.GeneralError
 		}
 
 		client.Offset.Store(payload.Offset)
@@ -175,41 +184,41 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 			currentOffset := client.Offset.Load()
 			if int(currentOffset) < len(topic.GetMessages()) {
 				if err := client.Deliver(topic.GetMessages()[currentOffset]); err != nil {
-					return nil, err
+					return nil, err, response.TopicError
 				}
 			}
 		}
 
-		return []byte("offset acknowleged successfully"), nil
+		return []byte("offset acknowleged successfully"), nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdAckOffset, f)
 }
 
 func (s *Server) handleDisconnect(p *packet.Packet) {
-	f := func(payload *commands.Disconnect) (any, error) {
+	f := func(payload *commands.Disconnect) (any, error, uint8) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
 		client, err := s.clients.Get(payload.Client)
 		if err != nil {
-			return nil, fmt.Errorf("error getting consumer list: %v", err)
+			return nil, fmt.Errorf("error getting consumer list: %v", err), response.GeneralError
 		}
 
 		topic := s.topics[client.Topic]
 		if topic == nil {
-			return nil, nil
+			return nil, fmt.Errorf("topic does not exist"), response.TopicError
 		}
 
 		_ = client.CloseIPCChannel()
 		topic.Unsubscribe(client.ID)
-		return []byte("disconnected successfully"), nil
+		return []byte("disconnected successfully"), nil, response.NoError
 	}
 
 	s.executeWithResponse(p, commands.CmdDisconnect, f)
 }
 
-func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packet, cmd uint8, f func(payload *T) (any, error)) {
+func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packet, cmd uint8, f func(payload *T) (any, error, uint8)) {
 	// unmarshall packet payload
 	payload, err := processPacket[T](p)
 	if err != nil {
@@ -225,18 +234,13 @@ func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packe
 	}
 
 	// run function
-	data, err := f(&payload)
+	data, err, code := f(&payload)
 
 	// handle errors
 	if err != nil {
 		e := err.Error()
 		log.Error(e)
-
-		errorCode := response.GeneralError
-		if errors.Is(err, ErrDuplicateTopic) || errors.Is(err, topic.ErrTopicClosed) {
-			errorCode = response.TopicError
-		}
-		s.sendError(outFifo, cmd, errorCode, e)
+		s.sendError(outFifo, cmd, code, e)
 		return
 	}
 
