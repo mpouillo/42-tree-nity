@@ -1,6 +1,8 @@
 package consumer
 
 import (
+	"fmt"
+	"regexp"
 	"sync/atomic"
 
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
@@ -9,6 +11,8 @@ import (
 	message "github.com/mpouillo/42-tree-nity/internal/message"
 	fifo "github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
+
+var validName = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
 
 type Consumer struct {
 	ID     string
@@ -19,6 +23,10 @@ type Consumer struct {
 }
 
 func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Consumer, error) {
+	if !validName.MatchString(id) {
+		return nil, fmt.Errorf("invalid name %q (expected %s)", id, validName)
+	}
+
 	fifo, err := fifo.Open(ipcPath, fifo.Write)
 	if err != nil {
 		return nil, err
