@@ -9,9 +9,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/consumer"
-	message "github.com/mpouillo/42-tree-nity/internal/message"
-	trie "github.com/mpouillo/42-tree-nity/internal/structs/trie"
+	"github.com/mpouillo/42-tree-nity/internal/message"
+	"github.com/mpouillo/42-tree-nity/internal/structs/trie"
 )
 
 var validName = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
@@ -52,6 +53,8 @@ func NewTopic(parentCtx context.Context, name string) (*Topic, error) {
 
 	t.wg.Add(1)
 	go t.run()
+
+	log.Debugf("created topic %v", t.Name)
 	return t, nil
 }
 
@@ -72,6 +75,8 @@ func (t *Topic) run() {
 func (t *Topic) Close() error {
 	t.cancel()
 	t.wg.Wait()
+
+	log.Debugf("closed topic %v", t.Name)
 	return nil
 }
 
@@ -130,6 +135,8 @@ func (t *Topic) Subscribe(c *consumer.Consumer) error {
 	if c.Prefix != "" {
 		t.prefixTrie.Insert(c.Prefix, c)
 	}
+	
+	log.Debugf("subscribed consumer %v to topic %v", c.ID, t.Name)
 	return nil
 }
 
@@ -147,6 +154,7 @@ func (t *Topic) Unsubscribe(clientID string) {
 	}
 
 	delete(t.consumers, clientID)
+	log.Debugf("unsubscribed consumer %v from topic %v", c.ID, t.Name)
 }
 
 func (t *Topic) MatchConsumers(key string) []*consumer.Consumer {
@@ -173,12 +181,14 @@ func (t *Topic) processAndDispatch(msg message.TopicMessage) {
 	for _, c := range subscribers {
 		if msg.Offset >= c.Offset.Load() {
 			if err := c.Deliver(msg); err != nil {
+				log.Errorf("failed to deliver message %v to consumer %v: %v", msg, c.ID, err)
 				t.Unsubscribe(c.ID)
 				if t.OnDisconnect != nil {
 					t.OnDisconnect(c.ID)
 				}
 				continue
 			}
+			log.Debugf("dispatched message %v to consumer %v", msg, c.ID)
 		}
 	}
 }
@@ -192,12 +202,12 @@ func (t *Topic) drainAndFlush() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	for id, c := range t.consumers {
+	for _, c := range t.consumers {
+		t.Unsubscribe(c.ID)
 		if t.OnDisconnect != nil {
 			t.OnDisconnect(c.ID)
 		}
 		_ = c.CloseIPCChannel()
-		delete(t.consumers, id)
 	}
 }
 
