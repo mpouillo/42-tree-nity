@@ -102,7 +102,7 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 
 		clientInfo, err := s.clients.Get(payload.Client)
 		if err != nil {
-			return nil, response.GeneralError, fmt.Errorf("error getting client info: %v", err)
+			return nil, response.TopicError, fmt.Errorf("error getting client info: %v", err)
 		}
 
 		data := response.InfoClientData{
@@ -184,9 +184,9 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 
 		client, err := s.clients.Get(payload.Client)
 		if err != nil && err != hashmap.ErrKeyNotFound {
-			return nil, response.GeneralError, fmt.Errorf("error getting consumer data from database: %v", err)
+			return nil, response.TopicError, fmt.Errorf("error getting consumer data from database: %v", err)
 		} else if err == hashmap.ErrKeyNotFound {
-			return nil, response.GeneralError, fmt.Errorf("client does not exist: %v", err)
+			return nil, response.TopicError, fmt.Errorf("client does not exist: %v", err)
 		}
 
 		client.Offset.Store(payload.Offset)
