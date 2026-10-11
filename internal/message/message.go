@@ -83,6 +83,7 @@ func FromSeparator(msg []byte, sep string) *Message {
 	} else {
 		body = bytes.Clone(body)
 	}
+	key = bytes.Clone(key)
 
 	return &Message{
 		Key:    key,
