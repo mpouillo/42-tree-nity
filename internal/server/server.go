@@ -16,13 +16,13 @@ import (
 type Server struct {
 	mu      sync.RWMutex
 	topics  map[string]*topic.Topic
-	clients *hashmap.Hashmap[consumer.Consumer]
+	clients *hashmap.Hashmap[*consumer.Consumer]
 }
 
 func NewServer() *Server {
 	return &Server{
 		topics:  make(map[string]*topic.Topic),
-		clients: hashmap.NewHashMap[consumer.Consumer](),
+		clients: hashmap.NewHashMap[*consumer.Consumer](),
 	}
 }
 

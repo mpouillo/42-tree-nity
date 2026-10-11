@@ -97,8 +97,6 @@ func WriteResponse(w io.Writer, cmd uint8, code uint8, errorMsg string, data any
 	if data != nil {
 
 		switch v := data.(type) {
-		case []byte:
-			dataBytes = v
 		case json.RawMessage:
 			dataBytes = v
 		default:

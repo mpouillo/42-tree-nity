@@ -13,6 +13,10 @@ const (
 	CmdDisconnect  uint8 = 7 // Client: Disconnect notification
 )
 
+type IPCPathProvider interface {
+	GetIPCPath() string
+}
+
 type CreateTopic struct {
 	IPCPath string `kong:"-"`
 	Topic   string `arg:""`
@@ -55,4 +59,32 @@ type AckOffset struct {
 type Disconnect struct {
 	IPCPath string
 	Client  string
+}
+
+func (c CreateTopic) GetIPCPath() string {
+	return c.IPCPath
+}
+
+func (c ListTopics) GetIPCPath() string {
+	return c.IPCPath
+}
+
+func (c InfoClient) GetIPCPath() string {
+	return c.IPCPath
+}
+
+func (c Produce) GetIPCPath() string {
+	return c.IPCPath
+}
+
+func (c Subscribe) GetIPCPath() string {
+	return c.IPCPath
+}
+
+func (c AckOffset) GetIPCPath() string {
+	return c.IPCPath
+}
+
+func (c Disconnect) GetIPCPath() string {
+	return c.IPCPath
 }
