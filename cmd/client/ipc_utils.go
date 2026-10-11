@@ -46,9 +46,11 @@ func OpenResponseFifo(ipc string) (*fifo.Fifo, int) {
 func SendCommand(commandInfo *ClientCommandInfo, cmd uint8, request any) int {
 	payload, err := json.Marshal(request)
 	if err != nil {
+		log.Errorf("failed to encode command %d: %v", cmd, err)
 		return int(response.GeneralError)
 	}
 	if err := packet.WritePacket(commandInfo.serverEndpoint, cmd, payload); err != nil {
+		log.Errorf("failed to send command %d to server: %v", cmd, err)
 		return int(response.IpcError)
 	}
 	return int(response.NoError)
