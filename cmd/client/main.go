@@ -16,8 +16,16 @@ func main() {
 	os.Exit(run())
 }
 
+func pidFifoPath(ipc string) string {
+	return fmt.Sprintf("%s.@%d", ipc, os.Getpid())
+}
+
+// for subscribe, the fifo opened in run is the consumer fifo
 func responseFifoPath(ipc, cmdName string, cli *CLI) string {
-	return fmt.Sprintf("%s.%d", ipc, os.Getpid())
+	if cmdName == "subscribe" {
+		return ipc + "." + cli.IPC.Subscribe.Client
+	}
+	return pidFifoPath(ipc)
 }
 
 func run() int {
