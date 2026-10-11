@@ -146,10 +146,10 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 		}
 
 		client, err := s.clients.Get(payload.Client)
-		if err != hashmap.ErrKeyNotFound {
+		if err != nil && err != hashmap.ErrKeyNotFound {
 			return nil, response.GeneralError, fmt.Errorf("error getting consumer data from database: %v", err)
-		}
-		if client == nil {
+		} else if err == hashmap.ErrKeyNotFound {
+			// client not found, create new client
 			var offset uint32
 			if payload.Offset != nil {
 				offset = *payload.Offset
@@ -177,8 +177,10 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 		defer s.mu.Unlock()
 
 		client, err := s.clients.Get(payload.Client)
-		if err != hashmap.ErrKeyNotFound {
+		if err != nil && err != hashmap.ErrKeyNotFound {
 			return nil, response.GeneralError, fmt.Errorf("error getting consumer data from database: %v", err)
+		} else if err == hashmap.ErrKeyNotFound {
+			return nil, response.GeneralError, fmt.Errorf("client does not exist: %v", err)
 		}
 
 		client.Offset.Store(payload.Offset)
@@ -233,7 +235,7 @@ func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packe
 	// open response FIFO
 	outFifo, err := fifo.Open(payload.GetIPCPath(), fifo.Write)
 	if err != nil {
-		log.Errorf("error creating response fifo: %v", err)
+		log.Warnf("error creating response fifo: %v", err)
 		return
 	}
 	defer func() { _ = outFifo.Close() }()
