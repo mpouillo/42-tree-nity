@@ -137,7 +137,6 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 
 		topic, exists := s.topics[payload.Topic]
 		if !exists {
-			s.sendError(payload.)
 			return nil, fmt.Errorf("topic does not exist"), response.TopicError
 		}
 
