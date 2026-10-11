@@ -119,7 +119,12 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 
 func (s *Server) handleProduce(p *packet.Packet) {
 	f := func(payload *commands.Produce) (any, uint8, error) {
-		_, err := s.topics[payload.Topic].Produce(payload.Message.Key, payload.Message.Body)
+		topic, exists := s.topics[payload.Topic]
+		if !exists {
+			return nil, response.TopicError, fmt.Errorf("topic does not exist")
+		}
+
+		_, err := topic.Produce(payload.Message.Key, payload.Message.Body)
 		if err != nil {
 			return nil, response.GeneralError, fmt.Errorf("error producing message: %v", err)
 		}
