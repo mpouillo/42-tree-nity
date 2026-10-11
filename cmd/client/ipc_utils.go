@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
@@ -11,6 +12,9 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
+
+// how long we wait for the server to answer a request before giving up
+const responseTimeout = 3 * time.Second
 
 func connectToEndpoint(ipc string) (*fifo.Fifo, int) {
 	f, err := fifo.Open(ipc, fifo.Write)
@@ -56,6 +60,10 @@ func ReadCommandResponse(ctx context.Context, fifo *fifo.Fifo) (uint8, *response
 	if errors.Is(err, context.Canceled) {
 		return commands.CmdNone, nil, int(response.NoError)
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		log.Errorf("server did not respond within %s", responseTimeout)
+		return commands.CmdNone, nil, int(response.IpcError)
+	}
 	if err != nil {
 		log.Errorf("read response: %v", err)
 		return commands.CmdNone, nil, int(response.IpcError)
@@ -80,7 +88,10 @@ func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int
 }
 
 func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.Response, int) {
-	resp, code := ReadResponse(c.context, c.responseFifoReader)
+	ctx, cancel := context.WithTimeout(c.context, responseTimeout)
+	defer cancel()
+
+	resp, code := ReadResponse(ctx, c.responseFifoReader)
 	if stopNewConnectionsAfter {
 		_ = c.responseFifo.Close()
 	}
