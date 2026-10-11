@@ -153,12 +153,12 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	// close to get EOF err if the server closes
 	_ = commandInfo.responseFifo.Close()
 
-	defer func() {
-		_ = SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{IPCPath: request.ConsumerPath, Client: request.Client})
-	}()
 	for {
 		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, consumerFifo)
 		if resp == nil {
+			if errCode == int(response.NoError){
+				SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{IPCPath: request.ConsumerPath, Client: request.Client})
+			}
 			return errCode
 		}
 
