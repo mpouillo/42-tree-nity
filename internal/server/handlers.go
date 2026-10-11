@@ -67,7 +67,7 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 				return
 			}
 
-			s.sendError(client.Fifo, commands.CmdDisconnect, response.IpcError, "")
+			s.sendError(client.Fifo, commands.CmdDisconnect, response.IpcError, "server connection closed")
 		}
 		s.topics[newTopic.Name] = newTopic
 
