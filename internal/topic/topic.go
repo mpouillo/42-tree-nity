@@ -3,6 +3,7 @@ package topic
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 
@@ -25,7 +26,7 @@ type Topic struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
-	onDisconnect func(clientID string)
+	OnDisconnect func(clientID string)
 }
 
 func NewTopic(parentCtx context.Context, name string) *Topic {
@@ -166,12 +167,11 @@ func (t *Topic) processAndDispatch(msg message.TopicMessage) {
 		if msg.Offset >= c.Offset.Load() {
 			if err := c.Deliver(msg); err != nil {
 				t.Unsubscribe(c.ID)
-				if t.onDisconnect != nil {
-					t.onDisconnect(c.ID)
+				if t.OnDisconnect != nil {
+					t.OnDisconnect(c.ID)
 				}
 				continue
 			}
-			c.Offset.Store(msg.Offset + 1)
 		}
 	}
 }
@@ -186,10 +186,14 @@ func (t *Topic) drainAndFlush() {
 	defer t.mu.Unlock()
 
 	for id, c := range t.consumers {
-		if t.onDisconnect != nil {
-			t.onDisconnect(c.ID)
+		if t.OnDisconnect != nil {
+			t.OnDisconnect(c.ID)
 		}
 		_ = c.CloseIPCChannel()
 		delete(t.consumers, id)
 	}
+}
+
+func (t *Topic) GetMessages() []message.TopicMessage {
+	return slices.Clone(t.messages)
 }
