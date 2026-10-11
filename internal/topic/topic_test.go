@@ -15,13 +15,20 @@ import (
 
 func TestNewTopic(t *testing.T) {
 	ctx := context.Background()
-	got := NewTopic(ctx, "test")
+	got, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	assert.Equal(t, "test", got.Name)
 	assert.Equal(t, uint32(0), got.nextOffset)
 	assert.Empty(t, got.messages)
 
 	_ = got.Close()
+}
+
+func TestNewTopic_InvalidName(t *testing.T) {
+	ctx := context.Background()
+	_, err := NewTopic(ctx, "invalid topic name with spaces!")
+	assert.Error(t, err)
 }
 
 func TestProduce(t *testing.T) {
@@ -40,7 +47,8 @@ func TestProduce(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			topic := NewTopic(ctx, "test")
+			topic, err := NewTopic(ctx, "test")
+			require.NoError(t, err)
 
 			offset, err := topic.Produce([]byte(tt.key), []byte(tt.body))
 			require.NoError(t, err)
@@ -61,7 +69,8 @@ func TestProduce(t *testing.T) {
 
 func TestProduce_SequentialOffsets(t *testing.T) {
 	ctx := context.Background()
-	topic := NewTopic(ctx, "test")
+	topic, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	o1, err := topic.Produce([]byte("k1"), []byte("v1"))
 	require.NoError(t, err)
@@ -80,17 +89,19 @@ func TestProduce_SequentialOffsets(t *testing.T) {
 
 func TestProduce_AfterClose(t *testing.T) {
 	ctx := context.Background()
-	topic := NewTopic(ctx, "test")
+	topic, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	require.NoError(t, topic.Close())
 
-	_, err := topic.Produce([]byte("user.update"), []byte("payload"))
+	_, err = topic.Produce([]byte("user.update"), []byte("payload"))
 	assert.ErrorIs(t, err, ErrTopicClosed)
 }
 
 func TestMatchConsumers(t *testing.T) {
 	ctx := context.Background()
-	topic := NewTopic(ctx, "test")
+	topic, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	cAll := &consumer.Consumer{ID: "c1", Prefix: ""}
 	cUser := &consumer.Consumer{ID: "c2", Prefix: "user."}
@@ -123,12 +134,13 @@ func TestMatchConsumers(t *testing.T) {
 
 func TestSubscribe_DuplicateClient(t *testing.T) {
 	ctx := context.Background()
-	topic := NewTopic(ctx, "test")
+	topic, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	c := &consumer.Consumer{ID: "client-1"}
 	topic.consumers[c.ID] = c
 
-	err := topic.Subscribe(c)
+	err = topic.Subscribe(c)
 	assert.ErrorIs(t, err, ErrDuplicateClient)
 
 	_ = topic.Close()
@@ -136,7 +148,8 @@ func TestSubscribe_DuplicateClient(t *testing.T) {
 
 func TestUnsubscribe(t *testing.T) {
 	ctx := context.Background()
-	topic := NewTopic(ctx, "test")
+	topic, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	c := &consumer.Consumer{ID: "client-1", Prefix: "user."}
 	topic.consumers[c.ID] = c
@@ -155,10 +168,11 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	pipePath, reader := setupTestFIFO(t)
 
 	ctx := context.Background()
-	topic := NewTopic(ctx, "test")
+	topic, err := NewTopic(ctx, "test")
+	require.NoError(t, err)
 
 	// 1. Produce historical message before subscription
-	_, err := topic.Produce([]byte("user.login"), []byte("historical"))
+	_, err = topic.Produce([]byte("user.login"), []byte("historical"))
 	require.NoError(t, err)
 
 	// 2. Subscribe consumer

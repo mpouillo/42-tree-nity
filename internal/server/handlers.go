@@ -55,7 +55,11 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 			return nil, ErrDuplicateTopic
 		}
 
-		newTopic := topic.NewTopic(ctx, payload.Topic)
+		newTopic, err := topic.NewTopic(ctx, payload.Topic)
+		if err != nil {
+			return nil, err
+		}
+
 		newTopic.OnDisconnect = func(clientID string) {
 			client, err := s.clients.Get(clientID)
 			if err != nil || client == nil {
