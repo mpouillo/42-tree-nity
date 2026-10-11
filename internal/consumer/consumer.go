@@ -39,7 +39,7 @@ func (c *Consumer) Deliver(msg message.TopicMessage) error {
 		return nil
 	}
 
-	data := msg.ToRaw()
+	data := response.SubscribeData{Message: msg}
 	return packet.WriteResponse(c.Fifo, commands.CmdSubscribe, response.NoError, "", data)
 }
 
