@@ -14,7 +14,7 @@ type stdinMessage struct {
 	err error
 }
 
-//Read in a go routine to not block the main go routine
+// Read in a go routine to not block the main go routine
 func readMessages(reader io.Reader, raw bool) <-chan stdinMessage {
 	stdinChannel := make(chan stdinMessage)
 
@@ -38,7 +38,6 @@ func readMessages(reader io.Reader, raw bool) <-chan stdinMessage {
 
 	return stdinChannel
 }
-
 
 // reads the next line, it skips invalid lines
 func readText(scanner *bufio.Scanner) (*messages.Message, error) {

@@ -134,7 +134,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	consumerFifo := commandInfo.responseFifoReader
 	request.ConsumerPath = consumerFifo.Path()
 
-	// pid fifo is used to handskake
+	// pid fifo is used to handshake
 	pidFifo, errCode := CreateResponseFifo(pidFifoPath(commandInfo.cli.IPC.IPC))
 	if errCode != int(response.NoError) {
 		return errCode

@@ -100,7 +100,6 @@ func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.R
 	return resp, code
 }
 
-
 func dialogWithServer(commandInfo ClientCommandInfo, cmd uint8, request any, stopNewConnectionsAfter bool) (*response.Response, int) {
 	if errCode := SendCommand(&commandInfo, cmd, request); errCode != int(response.NoError) {
 		return nil, errCode

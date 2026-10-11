@@ -3,8 +3,8 @@ package main
 import (
 	"regexp"
 
-	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/charmbracelet/log"
+	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
@@ -22,7 +22,7 @@ type CLI struct {
 	} `arg:""`
 }
 
-//checks that the names of the topics/clients are valid
+// checks that the names of the topics/clients are valid
 func (cli *CLI) validate(cmdName string) int {
 	check := func(what, value string) int {
 		if !validName.MatchString(value) {
