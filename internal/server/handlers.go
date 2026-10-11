@@ -43,7 +43,7 @@ func (s *Server) handleCommand(ctx context.Context, p *packet.Packet) {
 	case commands.CmdDisconnect:
 		s.handleDisconnect(p)
 	default:
-		log.Error("unknown command")
+		log.Errorf("unknown command: %v", p.Header.Command)
 	}
 }
 
@@ -67,10 +67,11 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 				return
 			}
 
-			s.sendError(client.Fifo, commands.CmdDisconnect, response.IpcError, "")
+			s.sendError(client.Fifo, commands.CmdDisconnect, response.IpcError, "server connection closed")
 		}
 		s.topics[newTopic.Name] = newTopic
 
+		log.Infof("created topic: %v", newTopic.Name)
 		return []byte("topic created"), response.NoError, nil
 	}
 
@@ -87,6 +88,7 @@ func (s *Server) handleListTopics(p *packet.Packet) {
 			topicList = append(topicList, name)
 		}
 
+		log.Infof("retrieved topic list: %v", topicList)
 		return response.ListTopicsData{Topics: topicList}, response.NoError, nil
 	}
 
@@ -100,7 +102,7 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 
 		clientInfo, err := s.clients.Get(payload.Client)
 		if err != nil {
-			return nil, response.GeneralError, fmt.Errorf("error getting client info: %v", err)
+			return nil, response.TopicError, fmt.Errorf("error getting client info: %v", err)
 		}
 
 		data := response.InfoClientData{
@@ -111,6 +113,7 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 			IPC:    clientInfo.Fifo.Path(),
 		}
 
+		log.Infof("retrieved client info: %v", clientInfo)
 		return data, response.NoError, nil
 	}
 
@@ -129,6 +132,7 @@ func (s *Server) handleProduce(p *packet.Packet) {
 			return nil, response.GeneralError, fmt.Errorf("error producing message: %v", err)
 		}
 
+		log.Infof("produced message: %v", payload.Message)
 		return []byte("message produced successfully"), response.NoError, nil
 	}
 
@@ -165,6 +169,8 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 		}
 
 		s.clients.Insert(client.ID, client)
+
+		log.Infof("subscribed consumer %v to topic %v", client.ID, topic.Name)
 		return []byte("subscription successful"), response.NoError, nil
 	}
 
@@ -178,9 +184,9 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 
 		client, err := s.clients.Get(payload.Client)
 		if err != nil && err != hashmap.ErrKeyNotFound {
-			return nil, response.GeneralError, fmt.Errorf("error getting consumer data from database: %v", err)
+			return nil, response.TopicError, fmt.Errorf("error getting consumer data from database: %v", err)
 		} else if err == hashmap.ErrKeyNotFound {
-			return nil, response.GeneralError, fmt.Errorf("client does not exist: %v", err)
+			return nil, response.TopicError, fmt.Errorf("client does not exist: %v", err)
 		}
 
 		client.Offset.Store(payload.Offset)
@@ -195,6 +201,7 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 			}
 		}
 
+		log.Infof("updated offset for consumer %v: %v", client.ID, client.Offset.Load())
 		return []byte("offset acknowleged successfully"), response.NoError, nil
 	}
 
@@ -218,6 +225,8 @@ func (s *Server) handleDisconnect(p *packet.Packet) {
 
 		_ = client.CloseIPCChannel()
 		topic.Unsubscribe(client.ID)
+
+		log.Infof("unsubscribed consumer %v from topic %v", client.ID, topic.Name)
 		return []byte("disconnected successfully"), response.NoError, nil
 	}
 
@@ -288,6 +297,7 @@ func (s *Server) sendSuccess(w io.Writer, cmd uint8, data any) error {
 		return err
 	}
 
+	log.Debugf("packet written to %v: %v", w, r)
 	return packet.WritePacket(w, cmd, rBytes)
 }
 
@@ -298,4 +308,5 @@ func (s *Server) sendError(w io.Writer, cmd uint8, code uint8, msg string) {
 	}
 	rBytes, _ := json.Marshal(r)
 	_ = packet.WritePacket(w, cmd, rBytes)
+	log.Debugf("packet written to %v: %v", w, r)
 }
