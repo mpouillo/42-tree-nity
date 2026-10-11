@@ -15,9 +15,11 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/structs/trie"
 )
 
-var validName = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
-var ErrDuplicateClient = errors.New("client already exists")
-var ErrTopicClosed = errors.New("topic is closed")
+var (
+	validName          = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
+	ErrDuplicateClient = errors.New("client already exists")
+	ErrTopicClosed     = errors.New("topic is closed")
+)
 
 type Topic struct {
 	Name         string
@@ -35,7 +37,7 @@ type Topic struct {
 
 func NewTopic(parentCtx context.Context, name string) (*Topic, error) {
 	if !validName.MatchString(name) {
-		return nil, fmt.Errorf("invalid name %q (expected %s)",  name, validName)
+		return nil, fmt.Errorf("invalid name %q (expected %s)", name, validName)
 	}
 
 	ctx, cancel := context.WithCancel(parentCtx)
@@ -135,7 +137,7 @@ func (t *Topic) Subscribe(c *consumer.Consumer) error {
 	if c.Prefix != "" {
 		t.prefixTrie.Insert(c.Prefix, c)
 	}
-	
+
 	log.Debugf("subscribed consumer %v to topic %v", c.ID, t.Name)
 	return nil
 }
@@ -203,12 +205,16 @@ func (t *Topic) drainAndFlush() {
 	defer t.mu.Unlock()
 
 	for _, c := range t.consumers {
-		t.Unsubscribe(c.ID)
+		if c.Prefix != "" {
+			t.prefixTrie.Remove(c.Prefix, c, func(a, b *consumer.Consumer) bool { return a.ID == b.ID })
+		}
 		if t.OnDisconnect != nil {
 			t.OnDisconnect(c.ID)
 		}
 		_ = c.CloseIPCChannel()
 	}
+
+	t.consumers = make(map[string]*consumer.Consumer)
 }
 
 func (t *Topic) GetMessages() []message.TopicMessage {
