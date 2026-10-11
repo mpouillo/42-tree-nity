@@ -4,16 +4,18 @@
 
 NAME := tree_nity
 GO_VERSION := 1.27.1
+SERVER = server
+CLIENT = client
 
-all: client server
+all: $(SERVER) $(CLIENT)
 
-run: server client
+$(SERVER):
+	@go mod tidy
+	@go build -o server ./cmd/server
 
-server:
-#	go build server
-
-client:
-#	go build client
+$(CLIENT):
+	@go mod tidy
+	@go build -o client ./cmd/client
 
 .ONESHELL:
 install-go:
@@ -36,6 +38,9 @@ test:
 	@golangci-lint run
 
 clean:
-	go clean
+	@go clean
+	@$(RM) $(SERVER) $(CLIENT)
 
 re: clean all
+
+.PHONY: all $(SERVER) $(CLIENT) install-go test clean re
