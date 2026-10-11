@@ -13,7 +13,9 @@ import (
 )
 
 func main() {
-	os.Exit(run())
+	code := run()
+	log.Infof("exited with code %d", code)
+	os.Exit(code)
 }
 
 func pidFifoPath(ipc string) string {
