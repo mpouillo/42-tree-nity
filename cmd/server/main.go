@@ -38,6 +38,6 @@ func main() {
 	err = srv.Serve(ctx, f)
 
 	if err != nil && !errors.Is(err, context.Canceled) && ctx.Err() == nil {
-        log.Fatalf("server error: %v", err)
+        log.Errorf("server error: %v", err)
     }
 }
