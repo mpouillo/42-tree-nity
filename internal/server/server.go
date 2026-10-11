@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 	"github.com/mpouillo/42-tree-nity/internal/structs/hashmap"
@@ -34,7 +35,7 @@ func (s *Server) Serve(ctx context.Context, fifo *fifo.Fifo) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return err
+			log.Errorf("error parsing packet: %v", err)
 		}
 		s.handleCommand(ctx, p)
 	}

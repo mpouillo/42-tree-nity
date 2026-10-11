@@ -3,6 +3,8 @@ package topic
 import (
 	"context"
 	"errors"
+	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -12,6 +14,7 @@ import (
 	trie "github.com/mpouillo/42-tree-nity/internal/structs/trie"
 )
 
+var validName = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
 var ErrDuplicateClient = errors.New("client already exists")
 var ErrTopicClosed = errors.New("topic is closed")
 
@@ -29,7 +32,11 @@ type Topic struct {
 	OnDisconnect func(clientID string)
 }
 
-func NewTopic(parentCtx context.Context, name string) *Topic {
+func NewTopic(parentCtx context.Context, name string) (*Topic, error) {
+	if !validName.MatchString(name) {
+		return nil, fmt.Errorf("invalid name %q (expected %s)",  name, validName)
+	}
+
 	ctx, cancel := context.WithCancel(parentCtx)
 
 	t := &Topic{
@@ -45,7 +52,7 @@ func NewTopic(parentCtx context.Context, name string) *Topic {
 
 	t.wg.Add(1)
 	go t.run()
-	return t
+	return t, nil
 }
 
 func (t *Topic) run() {
