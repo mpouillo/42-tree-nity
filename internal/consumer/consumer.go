@@ -18,8 +18,10 @@ type Consumer struct {
 	ID     string
 	Topic  string
 	Prefix string
-	Offset atomic.Uint32
+	Offset atomic.Uint32 // next offset to consume
 	Fifo   *fifo.Fifo
+
+	InFlight bool // a message is sent but not acknoleged
 }
 
 func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Consumer, error) {
