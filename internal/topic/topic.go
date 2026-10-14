@@ -182,16 +182,31 @@ func (t *Topic) Unsubscribe(clientID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	c, exists := t.consumers[clientID]
-	if !exists {
-		return
+	if c, exists := t.consumers[clientID]; exists {
+		t.removeConsumer(c)
 	}
+}
 
+// unsubscribe removes c only if it is still the consumer registered under its
+// ID: a stale consumer must not remove a newer one that reused the same name
+func (t *Topic) unsubscribe(c *consumer.Consumer) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.consumers[c.ID] != c {
+		return false
+	}
+	t.removeConsumer(c)
+	return true
+}
+
+// must be called with t.mu held
+func (t *Topic) removeConsumer(c *consumer.Consumer) {
 	if c.Prefix != "" {
 		t.prefixTrie.Remove(c.Prefix, c, func(a, b *consumer.Consumer) bool { return a.ID == b.ID })
 	}
 
-	delete(t.consumers, clientID)
+	delete(t.consumers, c.ID)
 	log.Debugf("unsubscribed consumer %v from topic %v", c.ID, t.Name)
 }
 
@@ -244,8 +259,7 @@ func (t *Topic) sendNext(c *consumer.Consumer) {
 
 	if err := c.Deliver(*next); err != nil {
 		log.Errorf("failed to deliver message %v to consumer %v: %v", *next, c.ID, err)
-		t.Unsubscribe(c.ID)
-		if t.OnDisconnect != nil {
+		if t.unsubscribe(c) && t.OnDisconnect != nil {
 			t.OnDisconnect(c)
 		}
 		return
