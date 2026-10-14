@@ -64,13 +64,10 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 			return nil, response.TopicError, err
 		}
 
-		newTopic.OnDisconnect = func(clientID string) {
-			client, err := s.clients.Get(clientID)
-			if err != nil || client == nil {
-				return
-			}
-
-			s.sendError(client.Fifo, commands.CmdDisconnect, response.IpcError, "server connection closed")
+		// runs in the topic goroutine: it gets the consumer directly so it
+		// never reads s.clients, which is only safe from the handlers
+		newTopic.OnDisconnect = func(c *consumer.Consumer) {
+			s.sendError(c.Fifo, commands.CmdDisconnect, response.IpcError, "server connection closed")
 		}
 		s.topics[newTopic.Name] = newTopic
 

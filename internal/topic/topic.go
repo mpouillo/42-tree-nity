@@ -35,7 +35,7 @@ type Topic struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
-	OnDisconnect func(clientID string)
+	OnDisconnect func(c *consumer.Consumer)
 }
 
 func NewTopic(parentCtx context.Context, name string) (*Topic, error) {
@@ -246,7 +246,7 @@ func (t *Topic) sendNext(c *consumer.Consumer) {
 		log.Errorf("failed to deliver message %v to consumer %v: %v", *next, c.ID, err)
 		t.Unsubscribe(c.ID)
 		if t.OnDisconnect != nil {
-			t.OnDisconnect(c.ID)
+			t.OnDisconnect(c)
 		}
 		return
 	}
@@ -268,7 +268,7 @@ func (t *Topic) drainAndFlush() {
 			t.prefixTrie.Remove(c.Prefix, c, func(a, b *consumer.Consumer) bool { return a.ID == b.ID })
 		}
 		if t.OnDisconnect != nil {
-			t.OnDisconnect(c.ID)
+			t.OnDisconnect(c)
 		}
 		_ = c.CloseIPCChannel()
 	}
