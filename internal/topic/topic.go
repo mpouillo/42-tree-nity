@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/consumer"
@@ -19,6 +20,9 @@ var (
 	validName          = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
 	ErrDuplicateClient = errors.New("client already exists")
 	ErrTopicClosed     = errors.New("topic is closed")
+
+	//disconnect a consumer that takes too much time to send ackoffset
+	ackTimeout = 3 * time.Second
 )
 
 type Topic struct {
@@ -70,6 +74,9 @@ func (t *Topic) run() {
 	defer t.wg.Done()
 	defer close(t.stopped)
 
+	ticker := time.NewTicker(ackTimeout / 5)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case msg := <-t.msgChan:
@@ -84,6 +91,8 @@ func (t *Topic) run() {
 			}
 			c.InFlight = false
 			t.sendNext(c)
+		case <-ticker.C:
+			t.disconnectUnacked()
 		case <-t.ctx.Done():
 			t.drainAndFlush()
 			return
@@ -259,13 +268,42 @@ func (t *Topic) sendNext(c *consumer.Consumer) {
 
 	if err := c.Deliver(*next); err != nil {
 		log.Errorf("failed to deliver message %v to consumer %v: %v", *next, c.ID, err)
-		if t.unsubscribe(c) && t.OnDisconnect != nil {
-			t.OnDisconnect(c)
-		}
+		t.disconnect(c)
 		return
 	}
 	c.InFlight = true
+	c.SentAt = time.Now()
 	log.Debugf("dispatched message %v to consumer %v", *next, c.ID)
+}
+
+// disconnects the consumers whose message is in flight for too long.
+// Must only be called from run().
+func (t *Topic) disconnectUnacked() {
+	t.mu.RLock()
+	var expired []*consumer.Consumer
+	for _, c := range t.consumers {
+		if c.InFlight && time.Since(c.SentAt) > ackTimeout {
+			expired = append(expired, c)
+		}
+	}
+	t.mu.RUnlock()
+
+	for _, c := range expired {
+		log.Warnf("consumer %v did not ack within %v", c.ID, ackTimeout)
+		t.disconnect(c)
+	}
+}
+
+// unsubscribes c, tells the client and closes its fifo, unless a newer
+// consumer already reused its name
+func (t *Topic) disconnect(c *consumer.Consumer) {
+	if !t.unsubscribe(c) {
+		return
+	}
+	if t.OnDisconnect != nil {
+		t.OnDisconnect(c)
+	}
+	_ = c.CloseIPCChannel()
 }
 
 func (t *Topic) drainAndFlush() {

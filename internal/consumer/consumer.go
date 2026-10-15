@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sync/atomic"
+	"time"
 
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
@@ -21,7 +22,8 @@ type Consumer struct {
 	Offset atomic.Uint32 // next offset to consume
 	Fifo   *fifo.Fifo
 
-	InFlight bool // a message is sent but not acknoleged
+	InFlight bool      // a message is sent but not acknoleged
+	SentAt   time.Time // when the in flight message was sent
 }
 
 func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Consumer, error) {
