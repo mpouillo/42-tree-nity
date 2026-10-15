@@ -198,6 +198,53 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	_ = reader.Close()
 }
 
+// A consumer that never acks its message (e.g. killed with SIGKILL) is disconnected
+func TestAckTimeout_DisconnectsConsumer(t *testing.T) {
+	setAckTimeout(t, 50*time.Millisecond)
+	pipePath, reader := setupTestFIFO(t)
+	defer func() { _ = reader.Close() }()
+
+	topic, err := NewTopic(context.Background(), "test")
+	require.NoError(t, err)
+	defer func() { _ = topic.Close() }()
+
+	_, err = topic.Produce([]byte("user.login"), []byte("never acked"))
+	require.NoError(t, err)
+
+	c, err := consumer.NewConsumer("client-1", "test", "", 0, pipePath)
+	require.NoError(t, err)
+	require.NoError(t, topic.Subscribe(c))
+
+	assert.Eventually(t, func() bool { return !topic.HasConsumer("client-1") },
+		time.Second, 10*time.Millisecond)
+}
+
+// A consumer with nothing in flight is never disconnected, however long it waits
+func TestAckTimeout_KeepsIdleConsumer(t *testing.T) {
+	setAckTimeout(t, 50*time.Millisecond)
+	pipePath, reader := setupTestFIFO(t)
+	defer func() { _ = reader.Close() }()
+
+	topic, err := NewTopic(context.Background(), "test")
+	require.NoError(t, err)
+	defer func() { _ = topic.Close() }()
+
+	c, err := consumer.NewConsumer("client-1", "test", "", 0, pipePath)
+	require.NoError(t, err)
+	require.NoError(t, topic.Subscribe(c))
+
+	time.Sleep(200 * time.Millisecond)
+	assert.True(t, topic.HasConsumer("client-1"))
+}
+
+// must be called before NewTopic: run() reads ackTimeout
+func setAckTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	previous := ackTimeout
+	ackTimeout = d
+	t.Cleanup(func() { ackTimeout = previous })
+}
+
 // Helper to create a non-blocking FIFO reader for IPC delivery testing
 func setupTestFIFO(t *testing.T) (string, *os.File) {
 	t.Helper()
