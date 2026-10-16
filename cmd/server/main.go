@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -35,9 +34,9 @@ func main() {
 	defer stop()
 
 	srv := server.NewServer()
-	err = srv.Serve(ctx, f)
+	go srv.Serve(f)
 
-	if err != nil && !errors.Is(err, context.Canceled) && ctx.Err() == nil {
-        log.Errorf("server error: %v", err)
-    }
+	// wait for the consumers to commit before removing the fifo
+	<-ctx.Done()
+	srv.Shutdown()
 }

@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/charmbracelet/log"
@@ -27,16 +29,27 @@ func NewServer() *Server {
 	}
 }
 
-func (s *Server) Serve(ctx context.Context, fifo *fifo.Fifo) error {
+func (s *Server) Serve(fifo *fifo.Fifo) {
 	fmt.Printf("%s\n", fifo.Path())
 	for {
-		p, err := packet.ReadPacket(ctx, fifo)
+		// context.background receive acks when the server disconnects
+		p, err := packet.ReadPacket(context.Background(), fifo)
 		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
 			log.Errorf("error parsing packet: %v", err)
 		}
-		s.handleCommand(ctx, p)
+		s.handleCommand(context.Background(), p)
 	}
+}
+
+// closes every topic
+func (s *Server) Shutdown() {
+	s.mu.RLock()
+	topics := slices.Collect(maps.Values(s.topics))
+	s.mu.RUnlock()
+
+	var wg sync.WaitGroup
+	for _, t := range topics {
+		wg.Go(func() { _ = t.Close() })
+	}
+	wg.Wait()
 }
