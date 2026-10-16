@@ -64,9 +64,8 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 			return nil, response.TopicError, err
 		}
 
-		// NoError: on shutdown the subject wants the consumers to exit with 0
-		newTopic.OnDisconnect = func(c *consumer.Consumer) {
-			s.sendError(c.Fifo, commands.CmdDisconnect, response.NoError, "server connection closed")
+		newTopic.OnDisconnect = func(c *consumer.Consumer, code uint8) {
+			s.sendError(c.Fifo, commands.CmdDisconnect, code, "server connection closed")
 		}
 		s.topics[newTopic.Name] = newTopic
 
