@@ -17,9 +17,7 @@ $(CLIENT):
 	@go mod tidy
 	@go build -o client ./cmd/client
 
-.ONESHELL:
 install-go:
-	@set -e
 	@chmod -R +w "$$HOME/go" || true
 	@rm -rf "$$HOME/go"
 	@wget "https://go.dev/dl/go$(GO_VERSION).linux-amd64.tar.gz" > /dev/null 2> /dev/null
@@ -33,8 +31,10 @@ install-go:
 	@echo "Done. Run 'source ~/.profile' or restart your terminal to update your current PATH."
 
 test:
-	@go build && echo "All good!"
+	@go build ./... && echo "All good!"
 	@go test ./... && echo "All good!"
+
+lint:
 	@golangci-lint run
 
 clean:
@@ -43,4 +43,4 @@ clean:
 
 re: clean all
 
-.PHONY: all $(SERVER) $(CLIENT) install-go test clean re
+.PHONY: all $(SERVER) $(CLIENT) install-go test lint clean re
