@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mpouillo/42-tree-nity/internal/consumer"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -165,6 +166,7 @@ func TestUnsubscribe(t *testing.T) {
 
 // Integration test verifying Subscribe catch-up & live dispatch over an IPC FIFO
 func TestSubscribeAndDispatch_Integration(t *testing.T) {
+	setShutdownTimeout(t, 50*time.Millisecond) // the message is never acked
 	pipePath, reader := setupTestFIFO(t)
 
 	ctx := context.Background()
@@ -237,12 +239,88 @@ func TestAckTimeout_KeepsIdleConsumer(t *testing.T) {
 	assert.True(t, topic.HasConsumer("client-1"))
 }
 
+// On close, a topic waits for the in-flight message to be acked, then tells the consumer to exit with 0
+func TestClose_WaitsForInFlightAck(t *testing.T) {
+	setShutdownTimeout(t, 2*time.Second)
+	pipePath, reader := setupTestFIFO(t)
+	defer func() { _ = reader.Close() }()
+
+	topic, err := NewTopic(context.Background(), "test")
+	require.NoError(t, err)
+	codes := make(chan uint8, 1)
+	topic.OnDisconnect = func(c *consumer.Consumer, code uint8) { codes <- code }
+
+	_, err = topic.Produce([]byte("user.login"), []byte("in flight"))
+	require.NoError(t, err)
+
+	c, err := consumer.NewConsumer("client-1", "test", "", 0, pipePath)
+	require.NoError(t, err)
+	require.NoError(t, topic.Subscribe(c))
+
+	// wait for the delivery, so the message is in flight when closing
+	buf := make([]byte, 256)
+	_, err = reader.Read(buf)
+	require.NoError(t, err)
+
+	closed := make(chan struct{})
+	go func() {
+		_ = topic.Close()
+		close(closed)
+	}()
+
+	select {
+	case <-closed:
+		t.Fatal("topic closed before the in-flight message was acked")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	require.NoError(t, topic.Ack(c))
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("topic did not close after the ack")
+	}
+	assert.Equal(t, response.NoError, <-codes)
+}
+
+// A consumer that never acks does not block the shutdown longer than shutdownTimeout
+func TestClose_ShutdownTimeout(t *testing.T) {
+	setShutdownTimeout(t, 100*time.Millisecond)
+	pipePath, reader := setupTestFIFO(t)
+	defer func() { _ = reader.Close() }()
+
+	topic, err := NewTopic(context.Background(), "test")
+	require.NoError(t, err)
+
+	_, err = topic.Produce([]byte("user.login"), []byte("never acked"))
+	require.NoError(t, err)
+
+	c, err := consumer.NewConsumer("client-1", "test", "", 0, pipePath)
+	require.NoError(t, err)
+	require.NoError(t, topic.Subscribe(c))
+
+	buf := make([]byte, 256)
+	_, err = reader.Read(buf)
+	require.NoError(t, err)
+
+	start := time.Now()
+	require.NoError(t, topic.Close())
+	assert.Less(t, time.Since(start), time.Second)
+}
+
 // must be called before NewTopic: run() reads ackTimeout
 func setAckTimeout(t *testing.T, d time.Duration) {
 	t.Helper()
 	previous := ackTimeout
 	ackTimeout = d
 	t.Cleanup(func() { ackTimeout = previous })
+}
+
+func setShutdownTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	previous := shutdownTimeout
+	shutdownTimeout = d
+	t.Cleanup(func() { shutdownTimeout = previous })
 }
 
 // Helper to create a non-blocking FIFO reader for IPC delivery testing

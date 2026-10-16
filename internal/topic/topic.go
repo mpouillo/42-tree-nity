@@ -24,6 +24,9 @@ var (
 
 	//disconnect a consumer that takes too much time to send ackoffset
 	ackTimeout = 3 * time.Second
+
+	// how long the server waits until he stops waiting for acks
+	shutdownTimeout = 5 * time.Second
 )
 
 type Topic struct {
@@ -95,7 +98,8 @@ func (t *Topic) run() {
 		case <-ticker.C:
 			t.disconnectUnacked()
 		case <-t.ctx.Done():
-			t.drainAndFlush()
+			t.waitInFlightAcks()
+			t.flush()
 			return
 		}
 	}
@@ -308,12 +312,34 @@ func (t *Topic) disconnect(c *consumer.Consumer) {
 	_ = c.CloseIPCChannel()
 }
 
-func (t *Topic) drainAndFlush() {
-	for len(t.msgChan) > 0 {
-		msg := <-t.msgChan
-		t.processAndDispatch(msg)
+// waits for the in-flight messages to be acked
+func (t *Topic) waitInFlightAcks() {
+	deadline := time.After(shutdownTimeout)
+	for t.hasInFlight() {
+		select {
+		case c := <-t.ackChan:
+			c.InFlight = false
+		case <-deadline:
+			log.Warnf("topic %v: consumers did not ack within %v", t.Name, shutdownTimeout)
+			return
+		}
 	}
+}
 
+func (t *Topic) hasInFlight() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	for _, c := range t.consumers {
+		if c.InFlight {
+			return true
+		}
+	}
+	return false
+}
+
+// tells every consumer to exit
+func (t *Topic) flush() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
