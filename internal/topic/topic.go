@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/consumer"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/message"
 	"github.com/mpouillo/42-tree-nity/internal/structs/trie"
 )
@@ -39,7 +40,7 @@ type Topic struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
-	OnDisconnect func(c *consumer.Consumer)
+	OnDisconnect func(c *consumer.Consumer, code uint8) // code is the exit code the client should use
 }
 
 func NewTopic(parentCtx context.Context, name string) (*Topic, error) {
@@ -295,13 +296,14 @@ func (t *Topic) disconnectUnacked() {
 }
 
 // unsubscribes c, tells the client and closes its fifo, unless a newer
-// consumer already reused its name
+// consumer already reused its name. The client did not choose to leave, so
+// it is an IPC error for it
 func (t *Topic) disconnect(c *consumer.Consumer) {
 	if !t.unsubscribe(c) {
 		return
 	}
 	if t.OnDisconnect != nil {
-		t.OnDisconnect(c)
+		t.OnDisconnect(c, response.IpcError)
 	}
 	_ = c.CloseIPCChannel()
 }
@@ -319,8 +321,9 @@ func (t *Topic) drainAndFlush() {
 		if c.Prefix != "" {
 			t.prefixTrie.Remove(c.Prefix, c, func(a, b *consumer.Consumer) bool { return a.ID == b.ID })
 		}
+		// graceful shutdown: the subject wants the consumers to exit with 0
 		if t.OnDisconnect != nil {
-			t.OnDisconnect(c)
+			t.OnDisconnect(c, response.NoError)
 		}
 		_ = c.CloseIPCChannel()
 	}
