@@ -53,8 +53,7 @@ func readText(scanner *bufio.Scanner) (*messages.Message, error) {
 
 		msg := messages.FromSeparator(line, ":")
 		if len(msg.Key)+len(msg.Body) > messages.MaxSize {
-			log.Errorf("%v, skipped", messages.ErrTooLarge)
-			continue
+			return nil, messages.ErrTooLarge
 		}
 		return msg, nil
 	}
