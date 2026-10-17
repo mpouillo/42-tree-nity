@@ -1,7 +1,10 @@
 package topic
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -9,7 +12,9 @@ import (
 	"time"
 
 	"github.com/mpouillo/42-tree-nity/internal/consumer"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
+	"github.com/mpouillo/42-tree-nity/internal/message"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -198,6 +203,96 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 
 	_ = topic.Close()
 	_ = reader.Close()
+}
+
+// Integration test of the whole filter: catch-up on stored messages, then live dispatch
+func TestPrefixFiltering_Integration(t *testing.T) {
+	setShutdownTimeout(t, 100*time.Millisecond)
+
+	topic, err := NewTopic(context.Background(), "test")
+	require.NoError(t, err)
+	defer func() { _ = topic.Close() }()
+
+	history := []string{"user.create", "admin.login", "user.update"}
+	live := []string{"user.create", "billing.paid", "user"} // "user" is shorter than the prefixes
+
+	tests := []struct {
+		prefix      string
+		wantHistory []string
+		wantLive    []string
+	}{
+		{"", history, live},
+		{"user.", []string{"user.create", "user.update"}, []string{"user.create"}},
+		{"user.create", []string{"user.create"}, []string{"user.create"}},
+	}
+
+	for _, key := range history {
+		_, err := topic.Produce([]byte(key), []byte("body"))
+		require.NoError(t, err)
+	}
+
+	consumers := make([]*consumer.Consumer, len(tests))
+	readers := make([]*bufio.Reader, len(tests))
+	for i, tt := range tests {
+		pipePath, reader := setupTestFIFO(t)
+		defer func() { _ = reader.Close() }()
+		readers[i] = packet.NewReader(reader)
+
+		consumers[i], err = consumer.NewConsumer(fmt.Sprintf("client-%d", i), "test", tt.prefix, 0, pipePath)
+		require.NoError(t, err)
+		require.NoError(t, topic.Subscribe(consumers[i]))
+	}
+
+	// stored messages are filtered when a consumer catches up
+	for i, tt := range tests {
+		got := consume(t, topic, consumers[i], readers[i], len(tt.wantHistory))
+		assert.Equal(t, tt.wantHistory, got, "history, prefix %q", tt.prefix)
+	}
+
+	// new messages only reach the matching consumers
+	for _, key := range live {
+		_, err := topic.Produce([]byte(key), []byte("body"))
+		require.NoError(t, err)
+	}
+	for i, tt := range tests {
+		got := consume(t, topic, consumers[i], readers[i], len(tt.wantLive))
+		assert.Equal(t, tt.wantLive, got, "live, prefix %q", tt.prefix)
+
+		_, err := readDelivered(t, readers[i], 100*time.Millisecond)
+		assert.ErrorIs(t, err, context.DeadlineExceeded, "prefix %q received an unexpected message", tt.prefix)
+	}
+}
+
+// receives n messages and acks each one, returns their keys in delivery order
+func consume(t *testing.T, topic *Topic, c *consumer.Consumer, r *bufio.Reader, n int) []string {
+	t.Helper()
+	var keys []string
+	for range n {
+		msg, err := readDelivered(t, r, time.Second)
+		require.NoError(t, err, "consumer %s", c.ID)
+		keys = append(keys, string(msg.Key))
+
+		c.Offset.Store(msg.Offset + 1)
+		require.NoError(t, topic.Ack(c))
+	}
+	return keys
+}
+
+// reads the next message written on a consumer fifo
+func readDelivered(t *testing.T, r *bufio.Reader, timeout time.Duration) (message.TopicMessage, error) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	p, err := packet.ReadPacket(ctx, r)
+	if err != nil {
+		return message.TopicMessage{}, err
+	}
+	var resp response.Response
+	require.NoError(t, json.Unmarshal(p.Payload, &resp))
+	var data response.SubscribeData
+	require.NoError(t, json.Unmarshal(resp.Data, &data))
+	return data.Message, nil
 }
 
 // A consumer that never acks its message (e.g. killed with SIGKILL) is disconnected
