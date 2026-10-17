@@ -1,6 +1,8 @@
 package trie
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +15,7 @@ func testTrieInit[T any](t *testing.T) {
 
 	require.NotNil(t, trie, "expected NewTrie() to return a non-nil Trie instance")
 	require.NotNil(t, trie.RootNode, "expected RootNode to be initialized, got nil")
-	assert.Empty(t,  trie.RootNode.Values)
+	assert.Empty(t, trie.RootNode.Values)
 }
 
 func TestNewTrie(t *testing.T) {
@@ -70,30 +72,30 @@ func TestInsert(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-    t.Run("remove existing value", func(t *testing.T) {
-        trie := NewTrie[client]()
-        c0 := client{"client0", 0}
-        c1 := client{"client1", 1}
+	t.Run("remove existing value", func(t *testing.T) {
+		trie := NewTrie[client]()
+		c0 := client{"client0", 0}
+		c1 := client{"client1", 1}
 
-        trie.Insert("user", c0)
-        trie.Insert("user", c1)
+		trie.Insert("user", c0)
+		trie.Insert("user", c1)
 
-        equals := func(a, b client) bool { return a.id == b.id }
-        trie.Remove("user", c0, equals)
+		equals := func(a, b client) bool { return a.id == b.id }
+		trie.Remove("user", c0, equals)
 
-        got := trie.Search("user")
-        assert.Equal(t, []client{c1}, got)
-    })
+		got := trie.Search("user")
+		assert.Equal(t, []client{c1}, got)
+	})
 
-    t.Run("remove non-existent key", func(t *testing.T) {
-        trie := NewTrie[client]()
-        c0 := client{"client0", 0}
+	t.Run("remove non-existent key", func(t *testing.T) {
+		trie := NewTrie[client]()
+		c0 := client{"client0", 0}
 
-        equals := func(a, b client) bool { return a.id == b.id }
-        trie.Remove("missing", c0, equals)
+		equals := func(a, b client) bool { return a.id == b.id }
+		trie.Remove("missing", c0, equals)
 
-        assert.Empty(t, trie.Search("missing"))
-    })
+		assert.Empty(t, trie.Search("missing"))
+	})
 }
 
 func TestSearch(t *testing.T) {
@@ -121,4 +123,84 @@ func TestSearch(t *testing.T) {
 		got := trie.Search("missing")
 		assert.Empty(t, got)
 	})
+
+	t.Run("mixed and overlapping prefixes", func(t *testing.T) {
+		trie := NewTrie[string]()
+		trie.Insert("use", "consumer-use")
+		trie.Insert("user", "consumer-user")
+		trie.Insert("username", "consumer-username")
+		trie.Insert("user.login", "consumer-login")
+		trie.Insert("useless", "consumer-useless")
+
+		got := trie.Search("user.login")
+
+		assert.Contains(t, got, "consumer-use")
+		assert.Contains(t, got, "consumer-user")
+		assert.Contains(t, got, "consumer-login")
+		assert.NotContains(t, got, "consumer-username")
+		assert.NotContains(t, got, "consumer-useless")
+	})
+}
+
+func TestEmptyTrieEdgeCases(t *testing.T) {
+	trie := NewTrie[int]()
+
+	results := trie.Search("any.key")
+	assert.Empty(t, results, "searching an empty trie should return no results")
+
+	equals := func(a, b int) bool { return a == b }
+	assert.NotPanics(t, func() {
+		trie.Remove("any.key", 42, equals)
+	}, "removing from an empty trie should not panic")
+}
+
+func TestLargeScaleTrie(t *testing.T) {
+	const size = 1000
+	trie := NewTrie[int]()
+
+	for i := range size {
+		key := fmt.Sprintf("prefix.key.%d", i)
+		trie.Insert(key, i)
+	}
+
+	results := trie.Search("prefix.key.500.subaction")
+	assert.ElementsMatch(t, []int{5, 50, 500}, results)
+
+	assert.Empty(t, trie.Search("other.key.500"))
+
+	for _, key := range []string{"prefix.key.999", "prefix.key.1", "prefix.key.10x", "prefix.key.", "prefix"} {
+		var want []int
+		for i := range size {
+			if strings.HasPrefix(key, fmt.Sprintf("prefix.key.%d", i)) {
+				want = append(want, i)
+			}
+		}
+		assert.ElementsMatch(t, want, trie.Search(key), "key %q", key)
+	}
+}
+
+func TestEmptyPrefixWildcard(t *testing.T) {
+	trie := NewTrie[string]()
+	trie.Insert("", "wildcard-consumer")
+	trie.Insert("user", "user-consumer")
+
+	gotUnrelated := trie.Search("admin.settings.update")
+	assert.Contains(t, gotUnrelated, "wildcard-consumer")
+	assert.NotContains(t, gotUnrelated, "user-consumer")
+
+	gotUser := trie.Search("user.login")
+	assert.Contains(t, gotUser, "wildcard-consumer")
+	assert.Contains(t, gotUser, "user-consumer")
+}
+
+func TestMultipleConsumersSamePrefix(t *testing.T) {
+	trie := NewTrie[string]()
+	trie.Insert("user.login", "client-alpha")
+	trie.Insert("user.login", "client-beta")
+
+	got := trie.Search("user.login")
+
+	assert.Len(t, got, 2)
+	assert.Contains(t, got, "client-alpha")
+	assert.Contains(t, got, "client-beta")
 }
