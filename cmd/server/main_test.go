@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
@@ -42,5 +44,39 @@ func TestOpenServerFifo(t *testing.T) {
 	}
 	if fi.Mode()&os.ModeNamedPipe == 0 {
 		t.Fatalf("expected a fifo, got mode %s", fi.Mode())
+	}
+}
+
+func TestRemoveClientFifos(t *testing.T) {
+	dir := t.TempDir()
+	srv := serverFifoPath(dir, 50)
+
+	mkfifo := func(path string) {
+		t.Helper()
+		if err := syscall.Mkfifo(path, 0600); err != nil {
+			t.Fatalf("mkfifo %s: %v", path, err)
+		}
+	}
+	mkfifo(srv)
+	mkfifo(srv + ".client0")                            // consumer fifo
+	mkfifo(srv + ".@42")                                // response fifo
+	mkfifo(filepath.Join(dir, "treenity.server.500.c")) // another server
+	if err := os.WriteFile(srv+".txt", nil, 0600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	removeClientFifos(srv)
+
+	for path, kept := range map[string]bool{
+		srv:              true,
+		srv + ".client0": false,
+		srv + ".@42":     false,
+		srv + ".txt":     true,
+		filepath.Join(dir, "treenity.server.500.c"): true,
+	} {
+		_, err := os.Lstat(path)
+		if exists := err == nil; exists != kept {
+			t.Errorf("%s: expected kept=%v, got exists=%v", path, kept, exists)
+		}
 	}
 }
