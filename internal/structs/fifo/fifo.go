@@ -16,7 +16,8 @@ type Fifo struct {
 	closeErr  error
 }
 
-// returns false if the FIFO already existed
+// createFifo creates a FIFO at path and reports whether it was created; an
+// existing FIFO is accepted, any other existing file (even a symlink) is not.
 func createFifo(path string) (created bool, err error) {
 	err = syscall.Mkfifo(path, fifoPerms)
 	if err == nil {
@@ -26,7 +27,6 @@ func createFifo(path string) (created bool, err error) {
 		return false, err
 	}
 
-	// Lstat does not follow symlink
 	fi, statErr := os.Lstat(path)
 	if statErr != nil {
 		return false, statErr
@@ -37,13 +37,14 @@ func createFifo(path string) (created bool, err error) {
 	return false, nil
 }
 
+// Open opens the existing FIFO at path with openmode. It refuses symlinks and
+// files that are not FIFOs.
 func Open(path string, openmode Mode) (*Fifo, error) {
 	flags, err := openmode.flags()
 	if err != nil {
 		return nil, err
 	}
 
-	// O_NOFOLLOW: refuse symlinks (keep files in /tmp)
 	file, err := os.OpenFile(path, flags|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
@@ -62,7 +63,8 @@ func Open(path string, openmode Mode) (*Fifo, error) {
 	return &Fifo{path: path, file: file}, nil
 }
 
-// an existing FIFO is reused and not removed on Close
+// Create creates the FIFO at path and opens it with openmode. An existing FIFO
+// is reused, and is then not removed by Close.
 func Create(path string, openmode Mode) (*Fifo, error) {
 	WeCreated, err := createFifo(path)
 	if err != nil {
@@ -80,11 +82,17 @@ func Create(path string, openmode Mode) (*Fifo, error) {
 	return f, nil
 }
 
-func (f *Fifo) Read(p []byte) (int, error)  { return f.file.Read(p) }
-func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
-func (f *Fifo) Path() string                { return f.path }
+// Read reads up to len(p) bytes from the FIFO.
+func (f *Fifo) Read(p []byte) (int, error) { return f.file.Read(p) }
 
-// Closes the Fifo and deletes the file if we are owner of it
+// Write writes p to the FIFO.
+func (f *Fifo) Write(p []byte) (int, error) { return f.file.Write(p) }
+
+// Path returns the path of the FIFO.
+func (f *Fifo) Path() string { return f.path }
+
+// Close closes the FIFO and removes it if it was created by Create. Only the
+// first call has an effect.
 func (f *Fifo) Close() error {
 	f.closeOnce.Do(func() {
 		f.closeErr = f.file.Close()

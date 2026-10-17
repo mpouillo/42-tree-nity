@@ -14,6 +14,8 @@ const (
 	ReadWrite
 )
 
+// flags returns the open flags of m. Write is non-blocking so that opening a
+// FIFO without reader fails instead of hanging.
 func (m Mode) flags() (int, error) {
 	switch m {
 	case Read:

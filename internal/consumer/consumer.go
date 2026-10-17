@@ -27,6 +27,8 @@ type Consumer struct {
 	SentAt   time.Time // when the in flight message was sent
 }
 
+// NewConsumer returns a consumer starting at offset, with the FIFO at ipcPath
+// opened for writing. It fails if id is not a valid client name.
 func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Consumer, error) {
 	if !validName.MatchString(id) {
 		return nil, fmt.Errorf("invalid name %q (expected %s)", id, validName)
@@ -47,6 +49,7 @@ func NewConsumer(id, topic, prefix string, offset uint32, ipcPath string) (*Cons
 	return c, nil
 }
 
+// Deliver writes msg to the FIFO of the consumer.
 func (c *Consumer) Deliver(msg message.TopicMessage) error {
 	if c == nil || c.Fifo == nil {
 		return nil
@@ -56,6 +59,7 @@ func (c *Consumer) Deliver(msg message.TopicMessage) error {
 	return packet.WriteResponse(c.Fifo, commands.CmdSubscribe, response.NoError, "", data)
 }
 
+// CloseIPCChannel closes the FIFO of the consumer. It is safe to call on a nil consumer.
 func (c *Consumer) CloseIPCChannel() error {
 	if c == nil || c.Fifo == nil {
 		return nil

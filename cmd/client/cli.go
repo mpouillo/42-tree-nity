@@ -21,7 +21,8 @@ type CLI struct {
 	} `arg:""`
 }
 
-// checks that the names of the topics/clients are valid
+// validate checks the topic and client names of cmdName and returns the exit
+// code to use: response.GeneralError if a name is invalid.
 func (cli *CLI) validate(cmdName string) int {
 	check := func(what, value string) int {
 		if !validName.MatchString(value) {

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestNewTopic checks that a new topic is named and empty.
 func TestNewTopic(t *testing.T) {
 	ctx := context.Background()
 	got, err := NewTopic(ctx, "test")
@@ -31,12 +32,14 @@ func TestNewTopic(t *testing.T) {
 	_ = got.Close()
 }
 
+// TestNewTopic_InvalidName checks that a topic name outside the allowed format is rejected.
 func TestNewTopic_InvalidName(t *testing.T) {
 	ctx := context.Background()
 	_, err := NewTopic(ctx, "invalid topic name with spaces!")
 	assert.Error(t, err)
 }
 
+// TestProduce checks that a produced message is stored as is at offset 0.
 func TestProduce(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -73,6 +76,7 @@ func TestProduce(t *testing.T) {
 	}
 }
 
+// TestProduce_SequentialOffsets checks that offsets increase by one per message.
 func TestProduce_SequentialOffsets(t *testing.T) {
 	ctx := context.Background()
 	topic, err := NewTopic(ctx, "test")
@@ -93,6 +97,7 @@ func TestProduce_SequentialOffsets(t *testing.T) {
 	_ = topic.Close()
 }
 
+// TestProduce_AfterClose checks that a closed topic refuses new messages.
 func TestProduce_AfterClose(t *testing.T) {
 	ctx := context.Background()
 	topic, err := NewTopic(ctx, "test")
@@ -104,6 +109,8 @@ func TestProduce_AfterClose(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTopicClosed)
 }
 
+// TestMatchConsumers checks that a key matches the empty-prefix consumers and
+// the consumers whose prefix it starts with.
 func TestMatchConsumers(t *testing.T) {
 	ctx := context.Background()
 	topic, err := NewTopic(ctx, "test")
@@ -113,24 +120,20 @@ func TestMatchConsumers(t *testing.T) {
 	cUser := &consumer.Consumer{ID: "c2", Prefix: "user."}
 	cOrder := &consumer.Consumer{ID: "c3", Prefix: "order."}
 
-	// Manually inject mock consumers into state for key-matching tests
 	topic.consumers[cAll.ID] = cAll
 	topic.consumers[cUser.ID] = cUser
 	topic.prefixTrie.Insert(cUser.Prefix, cUser)
 	topic.consumers[cOrder.ID] = cOrder
 	topic.prefixTrie.Insert(cOrder.Prefix, cOrder)
 
-	// "user.created" should match wildcard cAll and prefix cUser
 	matched := topic.MatchConsumers("user.created")
 	assert.Len(t, matched, 2)
 	assert.ElementsMatch(t, []*consumer.Consumer{cAll, cUser}, matched)
 
-	// "order.shipped" should match wildcard cAll and prefix cOrder
 	matchedOrder := topic.MatchConsumers("order.shipped")
 	assert.Len(t, matchedOrder, 2)
 	assert.ElementsMatch(t, []*consumer.Consumer{cAll, cOrder}, matchedOrder)
 
-	// "billing.paid" should match only wildcard cAll
 	matchedBilling := topic.MatchConsumers("billing.paid")
 	assert.Len(t, matchedBilling, 1)
 	assert.Equal(t, cAll, matchedBilling[0])
@@ -138,6 +141,7 @@ func TestMatchConsumers(t *testing.T) {
 	_ = topic.Close()
 }
 
+// TestSubscribe_DuplicateClient checks that a subscribed client name cannot subscribe again.
 func TestSubscribe_DuplicateClient(t *testing.T) {
 	ctx := context.Background()
 	topic, err := NewTopic(ctx, "test")
@@ -152,6 +156,7 @@ func TestSubscribe_DuplicateClient(t *testing.T) {
 	_ = topic.Close()
 }
 
+// TestUnsubscribe checks that an unsubscribed consumer no longer matches any key.
 func TestUnsubscribe(t *testing.T) {
 	ctx := context.Background()
 	topic, err := NewTopic(ctx, "test")
@@ -169,31 +174,28 @@ func TestUnsubscribe(t *testing.T) {
 	_ = topic.Close()
 }
 
-// Integration test verifying Subscribe catch-up & live dispatch over an IPC FIFO
+// TestSubscribeAndDispatch_Integration checks that a subscriber receives data
+// over its FIFO; the message is never acked.
 func TestSubscribeAndDispatch_Integration(t *testing.T) {
-	setShutdownTimeout(t, 50*time.Millisecond) // the message is never acked
+	setShutdownTimeout(t, 50*time.Millisecond)
 	pipePath, reader := setupTestFIFO(t)
 
 	ctx := context.Background()
 	topic, err := NewTopic(ctx, "test")
 	require.NoError(t, err)
 
-	// 1. Produce historical message before subscription
 	_, err = topic.Produce([]byte("user.login"), []byte("historical"))
 	require.NoError(t, err)
 
-	// 2. Subscribe consumer
 	c, err := consumer.NewConsumer("client-1", "test", "user.", 0, pipePath)
 	require.NoError(t, err)
 
 	err = topic.Subscribe(c)
 	require.NoError(t, err)
 
-	// 3. Produce live message after subscription
 	_, err = topic.Produce([]byte("user.logout"), []byte("live"))
 	require.NoError(t, err)
 
-	// Give background dispatch loop a brief moment to write to the pipe
 	time.Sleep(50 * time.Millisecond)
 
 	buf := make([]byte, 256)
@@ -205,7 +207,8 @@ func TestSubscribeAndDispatch_Integration(t *testing.T) {
 	_ = reader.Close()
 }
 
-// Integration test of the whole filter: catch-up on stored messages, then live dispatch
+// TestPrefixFiltering_Integration checks which messages each prefix consumer
+// receives, both when catching up on stored messages and live.
 func TestPrefixFiltering_Integration(t *testing.T) {
 	setShutdownTimeout(t, 100*time.Millisecond)
 
@@ -214,7 +217,7 @@ func TestPrefixFiltering_Integration(t *testing.T) {
 	defer func() { _ = topic.Close() }()
 
 	history := []string{"user.create", "admin.login", "user.update"}
-	live := []string{"user.create", "billing.paid", "user"} // "user" is shorter than the prefixes
+	live := []string{"user.create", "billing.paid", "user"}
 
 	tests := []struct {
 		prefix      string
@@ -243,13 +246,11 @@ func TestPrefixFiltering_Integration(t *testing.T) {
 		require.NoError(t, topic.Subscribe(consumers[i]))
 	}
 
-	// stored messages are filtered when a consumer catches up
 	for i, tt := range tests {
 		got := consume(t, topic, consumers[i], readers[i], len(tt.wantHistory))
 		assert.Equal(t, tt.wantHistory, got, "history, prefix %q", tt.prefix)
 	}
 
-	// new messages only reach the matching consumers
 	for _, key := range live {
 		_, err := topic.Produce([]byte(key), []byte("body"))
 		require.NoError(t, err)
@@ -263,7 +264,8 @@ func TestPrefixFiltering_Integration(t *testing.T) {
 	}
 }
 
-// receives n messages and acks each one, returns their keys in delivery order
+// consume receives n messages for c, acks each one and returns their keys in
+// delivery order.
 func consume(t *testing.T, topic *Topic, c *consumer.Consumer, r *bufio.Reader, n int) []string {
 	t.Helper()
 	var keys []string
@@ -278,7 +280,8 @@ func consume(t *testing.T, topic *Topic, c *consumer.Consumer, r *bufio.Reader, 
 	return keys
 }
 
-// reads the next message written on a consumer fifo
+// readDelivered returns the next message written on a consumer FIFO, or an
+// error if none arrives within timeout.
 func readDelivered(t *testing.T, r *bufio.Reader, timeout time.Duration) (message.TopicMessage, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -295,7 +298,8 @@ func readDelivered(t *testing.T, r *bufio.Reader, timeout time.Duration) (messag
 	return data.Message, nil
 }
 
-// A consumer that never acks its message (e.g. killed with SIGKILL) is disconnected
+// TestAckTimeout_DisconnectsConsumer checks that a consumer that never acks,
+// e.g. killed with SIGKILL, is disconnected.
 func TestAckTimeout_DisconnectsConsumer(t *testing.T) {
 	setAckTimeout(t, 50*time.Millisecond)
 	pipePath, reader := setupTestFIFO(t)
@@ -316,7 +320,8 @@ func TestAckTimeout_DisconnectsConsumer(t *testing.T) {
 		time.Second, 10*time.Millisecond)
 }
 
-// A consumer with nothing in flight is never disconnected, however long it waits
+// TestAckTimeout_KeepsIdleConsumer checks that a consumer with nothing in
+// flight is never disconnected.
 func TestAckTimeout_KeepsIdleConsumer(t *testing.T) {
 	setAckTimeout(t, 50*time.Millisecond)
 	pipePath, reader := setupTestFIFO(t)
@@ -334,7 +339,8 @@ func TestAckTimeout_KeepsIdleConsumer(t *testing.T) {
 	assert.True(t, topic.HasConsumer("client-1"))
 }
 
-// On close, a topic waits for the in-flight message to be acked, then tells the consumer to exit with 0
+// TestClose_WaitsForInFlightAck checks that Close waits for the in-flight ack,
+// then tells the consumer to exit with 0.
 func TestClose_WaitsForInFlightAck(t *testing.T) {
 	setShutdownTimeout(t, 2*time.Second)
 	pipePath, reader := setupTestFIFO(t)
@@ -352,7 +358,6 @@ func TestClose_WaitsForInFlightAck(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, topic.Subscribe(c))
 
-	// wait for the delivery, so the message is in flight when closing
 	buf := make([]byte, 256)
 	_, err = reader.Read(buf)
 	require.NoError(t, err)
@@ -378,7 +383,8 @@ func TestClose_WaitsForInFlightAck(t *testing.T) {
 	assert.Equal(t, response.NoError, <-codes)
 }
 
-// A consumer that never acks does not block the shutdown longer than shutdownTimeout
+// TestClose_ShutdownTimeout checks that a consumer that never acks does not
+// block Close longer than shutdownTimeout.
 func TestClose_ShutdownTimeout(t *testing.T) {
 	setShutdownTimeout(t, 100*time.Millisecond)
 	pipePath, reader := setupTestFIFO(t)
@@ -403,7 +409,8 @@ func TestClose_ShutdownTimeout(t *testing.T) {
 	assert.Less(t, time.Since(start), time.Second)
 }
 
-// must be called before NewTopic: run() reads ackTimeout
+// setAckTimeout sets ackTimeout to d for the duration of the test. It must be
+// called before NewTopic, whose goroutine reads it.
 func setAckTimeout(t *testing.T, d time.Duration) {
 	t.Helper()
 	previous := ackTimeout
@@ -411,6 +418,7 @@ func setAckTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { ackTimeout = previous })
 }
 
+// setShutdownTimeout sets shutdownTimeout to d for the duration of the test.
 func setShutdownTimeout(t *testing.T, d time.Duration) {
 	t.Helper()
 	previous := shutdownTimeout
@@ -418,7 +426,8 @@ func setShutdownTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { shutdownTimeout = previous })
 }
 
-// Helper to create a non-blocking FIFO reader for IPC delivery testing
+// setupTestFIFO creates a FIFO and returns its path with a read end, opened
+// read-write so that it never blocks and NewConsumer can open it for writing.
 func setupTestFIFO(t *testing.T) (string, *os.File) {
 	t.Helper()
 	dir := t.TempDir()
@@ -427,7 +436,6 @@ func setupTestFIFO(t *testing.T) (string, *os.File) {
 	err := syscall.Mkfifo(pipePath, 0600)
 	require.NoError(t, err)
 
-	// Open read-end non-blocking so NewConsumer write-open won't hang
 	r, err := os.OpenFile(pipePath, os.O_RDWR, 0600)
 	require.NoError(t, err)
 

@@ -24,6 +24,7 @@ type Server struct {
 	clients *hashmap.Hashmap[*consumer.Consumer]
 }
 
+// NewServer returns a server with no topics and no registered clients.
 func NewServer() *Server {
 	return &Server{
 		topics:  make(map[string]*topic.Topic),
@@ -31,13 +32,13 @@ func NewServer() *Server {
 	}
 }
 
+// Serve prints the path of fifo and handles the requests read from it until
+// the fifo is closed. It keeps reading during Shutdown so that acks still arrive.
 func (s *Server) Serve(fifo *fifo.Fifo) {
 	fmt.Printf("%s\n", fifo.Path())
 	reader := packet.NewReader(fifo)
 	for {
-		// context.background receive acks when the server disconnects
 		p, err := packet.ReadPacket(context.Background(), reader)
-		// main closed the fifo after Shutdown: the server is exiting
 		if errors.Is(err, os.ErrClosed) {
 			return
 		}
@@ -48,7 +49,7 @@ func (s *Server) Serve(fifo *fifo.Fifo) {
 	}
 }
 
-// closes every topic
+// Shutdown closes every topic in parallel, each one waiting for its consumers to commit.
 func (s *Server) Shutdown() {
 	s.mu.RLock()
 	topics := slices.Collect(maps.Values(s.topics))

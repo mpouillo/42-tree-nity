@@ -38,6 +38,7 @@ var commandList = map[string]Command{
 	"subscribe": {run: cmdSubscribe},
 }
 
+// cmdList prints the topics of the server as a comma-separated list.
 func cmdList(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.List
 	request.IPCPath = commandInfo.responseFifoReader.Path()
@@ -56,6 +57,7 @@ func cmdList(commandInfo ClientCommandInfo) int {
 	return int(response.NoError)
 }
 
+// cmdInfo prints the metadata of a registered client as a JSON object.
 func cmdInfo(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Info
 	request.IPCPath = commandInfo.responseFifoReader.Path()
@@ -74,6 +76,7 @@ func cmdInfo(commandInfo ClientCommandInfo) int {
 	return int(response.NoError)
 }
 
+// cmdCreate creates a topic and prints a confirmation.
 func cmdCreate(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Create
 	request.IPCPath = commandInfo.responseFifoReader.Path()
@@ -88,6 +91,8 @@ func cmdCreate(commandInfo ClientCommandInfo) int {
 	return int(response.NoError)
 }
 
+// cmdProduce checks that the topic exists, then sends every message read from
+// stdin to it until EOF or a signal.
 func cmdProduce(commandInfo ClientCommandInfo) int {
 	listRequest := commandInfo.cli.IPC.List
 	request := commandInfo.cli.IPC.Produce
@@ -132,13 +137,14 @@ func cmdProduce(commandInfo ClientCommandInfo) int {
 	}
 }
 
+// cmdSubscribe registers the consumer through a PID FIFO handshake, then prints
+// and acknowledges each message received on the consumer FIFO.
 func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Subscribe
 	consumerFifo := commandInfo.responseFifoReader
 	request.ConsumerPath = consumerFifo.Path()
 	request.PID = os.Getpid()
 
-	// pid fifo is used to handshake
 	pidFifo, errCode := CreateResponseFifo(pidFifoPath(commandInfo.cli.IPC.IPC))
 	if errCode != int(response.NoError) {
 		return errCode
@@ -155,7 +161,6 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	}
 	fmt.Printf("subscribed to %s\n", request.Topic)
 
-	// close to get EOF err if the server closes
 	_ = commandInfo.responseFifo.Close()
 
 	for {

@@ -9,6 +9,7 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
+// TestServerFifoPath checks that the server FIFO path is built from the PID.
 func TestServerFifoPath(t *testing.T) {
 	t.Run("normal check", func(t *testing.T) {
 		expected := "/tmp/treenity.server.50"
@@ -26,6 +27,7 @@ func TestServerFifoPath(t *testing.T) {
 	})
 }
 
+// TestOpenServerFifo checks that the server creates a FIFO at its PID-based path.
 func TestOpenServerFifo(t *testing.T) {
 	f, err := openServerFifo(fifo.ReadWrite)
 	if err != nil {
@@ -47,6 +49,8 @@ func TestOpenServerFifo(t *testing.T) {
 	}
 }
 
+// TestRemoveClientFifos checks that only the client FIFOs of this server are
+// removed, not its own FIFO, regular files or the FIFOs of another server.
 func TestRemoveClientFifos(t *testing.T) {
 	dir := t.TempDir()
 	srv := serverFifoPath(dir, 50)
@@ -58,9 +62,9 @@ func TestRemoveClientFifos(t *testing.T) {
 		}
 	}
 	mkfifo(srv)
-	mkfifo(srv + ".client0")                            // consumer fifo
-	mkfifo(srv + ".@42")                                // response fifo
-	mkfifo(filepath.Join(dir, "treenity.server.500.c")) // another server
+	mkfifo(srv + ".client0")
+	mkfifo(srv + ".@42")
+	mkfifo(filepath.Join(dir, "treenity.server.500.c"))
 	if err := os.WriteFile(srv+".txt", nil, 0600); err != nil {
 		t.Fatalf("write file: %v", err)
 	}

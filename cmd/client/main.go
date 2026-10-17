@@ -13,17 +13,20 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
+// main runs the client and exits with the code returned by run.
 func main() {
 	code := run()
 	log.Infof("exited with code %d", code)
 	os.Exit(code)
 }
 
+// pidFifoPath returns the response FIFO path of this process, unique thanks to its PID.
 func pidFifoPath(ipc string) string {
 	return fmt.Sprintf("%s.@%d", ipc, os.Getpid())
 }
 
-// for subscribe, the fifo opened in run is the consumer fifo
+// responseFifoPath returns the FIFO on which cmdName receives its answers:
+// the consumer FIFO for subscribe, the PID FIFO otherwise.
 func responseFifoPath(ipc, cmdName string, cli *CLI) string {
 	if cmdName == "subscribe" {
 		return ipc + "." + cli.IPC.Subscribe.Client
@@ -31,6 +34,8 @@ func responseFifoPath(ipc, cmdName string, cli *CLI) string {
 	return pidFifoPath(ipc)
 }
 
+// run parses the arguments, connects to the server and executes the selected
+// subcommand, returning the client exit code.
 func run() int {
 	var cli CLI
 	parser, err := kong.New(&cli, kong.NoDefaultHelp())
@@ -45,7 +50,7 @@ func run() int {
 
 	cmdName := parsed.Selected().Name
 	cmd, ok := commandList[cmdName]
-	if !ok { // just in case but should not happen
+	if !ok {
 		log.Errorf("unknown command %s", cmdName)
 		return int(response.GeneralError)
 	}

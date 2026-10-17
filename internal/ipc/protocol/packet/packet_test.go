@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestWriteAndReadPacket checks that a written packet is read back unchanged.
 func TestWriteAndReadPacket(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -58,6 +59,7 @@ func TestWriteAndReadPacket(t *testing.T) {
 	}
 }
 
+// TestWritePacketErrors checks that a payload larger than MaxPayloadSize is rejected.
 func TestWritePacketErrors(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -79,6 +81,7 @@ func TestWritePacketErrors(t *testing.T) {
 	}
 }
 
+// TestReadPacketValidationErrors checks that a stream with no valid packet ends with io.EOF.
 func TestReadPacketValidationErrors(t *testing.T) {
 	tests := []struct {
 		name string
@@ -111,6 +114,7 @@ func TestReadPacketValidationErrors(t *testing.T) {
 	}
 }
 
+// TestReadPacketContextCancel checks that ReadPacket returns when its context is cancelled.
 func TestReadPacketContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -122,7 +126,7 @@ func TestReadPacketContextCancel(t *testing.T) {
 	assert.Nil(t, got)
 }
 
-// returns the bytes of a packet and the packet ReadPacket should give back
+// encode returns the bytes of a packet and the packet ReadPacket should give back.
 func encode(t *testing.T, command uint8, payload string) ([]byte, *Packet) {
 	t.Helper()
 
@@ -139,6 +143,8 @@ func encode(t *testing.T, command uint8, payload string) ([]byte, *Packet) {
 	}
 }
 
+// TestReadPacketResync checks that ReadPacket skips garbage and fake headers to
+// find the next valid packet.
 func TestReadPacketResync(t *testing.T) {
 	first, firstPacket := encode(t, 1, `{"Topic":"events"}`)
 	second, secondPacket := encode(t, 2, `{"IPCPath":"/tmp/x"}`)

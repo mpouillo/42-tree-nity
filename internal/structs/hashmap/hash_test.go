@@ -2,6 +2,7 @@ package hashmap
 
 import "testing"
 
+// TestHash checks that hash is deterministic and always below size.
 func TestHash(t *testing.T) {
 	tests := []string{
 		"salutations",

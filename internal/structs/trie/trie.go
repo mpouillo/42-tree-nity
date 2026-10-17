@@ -7,6 +7,7 @@ type Node[T any] struct {
 	Children map[rune]*Node[T]
 }
 
+// NewNode returns a node with no values and no children.
 func NewNode[T any]() *Node[T] {
 	return &Node[T]{
 		Values:   make([]T, 0),
@@ -18,10 +19,12 @@ type Trie[T any] struct {
 	RootNode *Node[T]
 }
 
+// NewTrie returns an empty trie.
 func NewTrie[T any]() *Trie[T] {
 	return &Trie[T]{RootNode:NewNode[T]()}
 }
 
+// Insert adds value under key; several values can share the same key.
 func (t *Trie[T]) Insert(key string, value T) {
 	current := t.RootNode
 
@@ -34,6 +37,7 @@ func (t *Trie[T]) Insert(key string, value T) {
 	current.Values = append(current.Values, value)
 }
 
+// Remove deletes the values stored under key that are equal to target.
 func (t *Trie[T]) Remove(key string, target T, equals func(a, b T) bool) {
 	current := t.RootNode
 
@@ -49,6 +53,7 @@ func (t *Trie[T]) Remove(key string, target T, equals func(a, b T) bool) {
 	})
 }
 
+// Search returns the values of every key that is a prefix of key, shortest first.
 func (t *Trie[T]) Search(key string) []T {
 	current := t.RootNode
 	var matches []T

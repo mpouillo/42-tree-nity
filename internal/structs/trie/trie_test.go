@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testTrieInit checks that a new trie of values of type T has an empty root.
 func testTrieInit[T any](t *testing.T) {
 	t.Helper()
 	trie := NewTrie[T]()
@@ -18,6 +19,7 @@ func testTrieInit[T any](t *testing.T) {
 	assert.Empty(t, trie.RootNode.Values)
 }
 
+// TestNewTrie checks that new tries are empty for several value types.
 func TestNewTrie(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
 		testTrieInit[string](t)
@@ -42,6 +44,7 @@ type client struct {
 	offset uint32
 }
 
+// TestInsert checks that a value is stored at the node of its key, the root for "".
 func TestInsert(t *testing.T) {
 	t.Run("basic insert", func(t *testing.T) {
 		key := "user"
@@ -71,6 +74,7 @@ func TestInsert(t *testing.T) {
 	})
 }
 
+// TestRemove checks that Remove deletes only the target value and ignores missing keys.
 func TestRemove(t *testing.T) {
 	t.Run("remove existing value", func(t *testing.T) {
 		trie := NewTrie[client]()
@@ -98,6 +102,7 @@ func TestRemove(t *testing.T) {
 	})
 }
 
+// TestSearch checks partial matches, non-matches and overlapping prefixes.
 func TestSearch(t *testing.T) {
 	t.Run("prefix match", func(t *testing.T) {
 		trie := NewTrie[client]()
@@ -142,6 +147,7 @@ func TestSearch(t *testing.T) {
 	})
 }
 
+// TestEmptyTrieEdgeCases checks searching and removing in an empty trie.
 func TestEmptyTrieEdgeCases(t *testing.T) {
 	trie := NewTrie[int]()
 
@@ -154,6 +160,7 @@ func TestEmptyTrieEdgeCases(t *testing.T) {
 	}, "removing from an empty trie should not panic")
 }
 
+// TestLargeScaleTrie checks searches in a trie of 1000 keys against a brute-force scan.
 func TestLargeScaleTrie(t *testing.T) {
 	const size = 1000
 	trie := NewTrie[int]()
@@ -179,6 +186,7 @@ func TestLargeScaleTrie(t *testing.T) {
 	}
 }
 
+// TestEmptyPrefixWildcard checks that an empty prefix matches every key.
 func TestEmptyPrefixWildcard(t *testing.T) {
 	trie := NewTrie[string]()
 	trie.Insert("", "wildcard-consumer")
@@ -193,6 +201,8 @@ func TestEmptyPrefixWildcard(t *testing.T) {
 	assert.Contains(t, gotUser, "user-consumer")
 }
 
+// TestMultipleConsumersSamePrefix checks that values sharing a prefix are all
+// found by an exact match.
 func TestMultipleConsumersSamePrefix(t *testing.T) {
 	trie := NewTrie[string]()
 	trie.Insert("user.login", "client-alpha")

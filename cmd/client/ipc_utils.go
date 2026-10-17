@@ -14,9 +14,11 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
-// how long we wait for the server to answer a request before giving up
+// responseTimeout is how long the client waits for the server to answer a request.
 const responseTimeout = 3 * time.Second
 
+// connectToEndpoint opens the main server FIFO for writing. It fails with
+// response.GeneralError if ipc is not a FIFO read by a running server.
 func connectToEndpoint(ipc string) (*fifo.Fifo, int) {
 	f, err := fifo.Open(ipc, fifo.Write)
 	if err != nil {
@@ -26,6 +28,7 @@ func connectToEndpoint(ipc string) (*fifo.Fifo, int) {
 	return f, int(response.NoError)
 }
 
+// CreateResponseFifo creates the FIFO at path ipc on which the client receives answers.
 func CreateResponseFifo(ipc string) (*fifo.Fifo, int) {
 	f, err := fifo.Create(ipc, fifo.ReadWrite)
 	if err != nil {
@@ -35,6 +38,7 @@ func CreateResponseFifo(ipc string) (*fifo.Fifo, int) {
 	return f, int(response.NoError)
 }
 
+// OpenResponseFifo opens the response FIFO at path ipc for reading.
 func OpenResponseFifo(ipc string) (*fifo.Fifo, int) {
 	f, err := fifo.Open(ipc, fifo.Read)
 	if err != nil {
@@ -44,6 +48,8 @@ func OpenResponseFifo(ipc string) (*fifo.Fifo, int) {
 	return f, int(response.NoError)
 }
 
+// SendCommand encodes request as JSON and writes it to the server as a cmd packet.
+// It returns response.IpcError if the server cannot be reached.
 func SendCommand(commandInfo *ClientCommandInfo, cmd uint8, request any) int {
 	payload, err := json.Marshal(request)
 	if err != nil {
@@ -57,7 +63,8 @@ func SendCommand(commandInfo *ClientCommandInfo, cmd uint8, request any) int {
 	return int(response.NoError)
 }
 
-// like ReadResponse, but also returns the command of the packet
+// ReadCommandResponse is like ReadResponse but also returns the command of the
+// packet. A cancelled ctx gives a nil response with response.NoError.
 func ReadCommandResponse(ctx context.Context, r *bufio.Reader) (uint8, *response.Response, int) {
 	pkt, err := packet.ReadPacket(ctx, r)
 	if errors.Is(err, context.Canceled) {
@@ -85,11 +92,15 @@ func ReadCommandResponse(ctx context.Context, r *bufio.Reader) (uint8, *response
 	return pkt.Header.Command, &resp, int(response.NoError)
 }
 
+// ReadResponse reads the next response from r and returns it with the exit
+// code it implies; the response is nil if the server reported an error.
 func ReadResponse(ctx context.Context, r *bufio.Reader) (*response.Response, int) {
 	_, resp, errCode := ReadCommandResponse(ctx, r)
 	return resp, errCode
 }
 
+// GetResponse waits up to responseTimeout for the answer to the last request,
+// then closes the response FIFO if stopNewConnectionsAfter is true.
 func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.Response, int) {
 	ctx, cancel := context.WithTimeout(c.context, responseTimeout)
 	defer cancel()
@@ -101,6 +112,7 @@ func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.R
 	return resp, code
 }
 
+// dialogWithServer sends request as a cmd packet and returns the answer of the server.
 func dialogWithServer(commandInfo ClientCommandInfo, cmd uint8, request any, stopNewConnectionsAfter bool) (*response.Response, int) {
 	if errCode := SendCommand(&commandInfo, cmd, request); errCode != int(response.NoError) {
 		return nil, errCode
@@ -114,6 +126,7 @@ func dialogWithServer(commandInfo ClientCommandInfo, cmd uint8, request any, sto
 	return resp, int(response.NoError)
 }
 
+// unmarshallResponse decodes the data of resp into a value of type T.
 func unmarshallResponse[T any](resp *response.Response) (T, int) {
 	var data T
 	err := json.Unmarshal(resp.Data, &data)

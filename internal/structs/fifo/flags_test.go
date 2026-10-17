@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestModeFlags checks the open flags of each mode.
 func TestModeFlags(t *testing.T) {
 	t.Run("check known modes", func(t *testing.T) {
 		cases := []struct {

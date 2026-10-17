@@ -14,16 +14,20 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
 
+// serverFifoPath returns the path of the main FIFO of the server with the given pid in dir.
 func serverFifoPath(dir string, pid int) string {
 	return filepath.Join(dir, fmt.Sprintf("treenity.server.%d", pid))
 }
 
+// openServerFifo creates the main FIFO of this server in /tmp and opens it with mode.
 func openServerFifo(mode fifo.Mode) (*fifo.Fifo, error) {
 	pid := os.Getpid()
 	path := serverFifoPath("/tmp", pid)
 	return fifo.Create(path, mode)
 }
 
+// main serves clients until SIGINT or SIGTERM, then waits for the consumers to
+// commit and removes every FIFO of the server.
 func main() {
 	f, err := openServerFifo(fifo.ReadWrite)
 	if err != nil {
@@ -37,13 +41,13 @@ func main() {
 	srv := server.NewServer()
 	go srv.Serve(f)
 
-	// wait for the consumers to commit before removing the fifo
 	<-ctx.Done()
 	srv.Shutdown()
 	removeClientFifos(f.Path())
 }
 
-// removes the fifos left by killed clients of this server
+// removeClientFifos removes the client FIFOs of the server at serverPath,
+// including those left behind by killed clients.
 func removeClientFifos(serverPath string) {
 	paths, err := filepath.Glob(serverPath + ".*")
 	if err != nil {

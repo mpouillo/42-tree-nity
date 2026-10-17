@@ -7,6 +7,7 @@ import (
     "github.com/stretchr/testify/assert"
 )
 
+// TestFromSeparator checks that a line is split at its first separator.
 func TestFromSeparator(t *testing.T) {
     tests := []struct {
         name      string
@@ -50,6 +51,7 @@ func TestFromSeparator(t *testing.T) {
     }
 }
 
+// TestFromRaw checks that valid raw messages, including binary ones, are decoded.
 func TestFromRaw(t *testing.T) {
     tests := []struct {
         name string
@@ -96,6 +98,7 @@ func TestFromRaw(t *testing.T) {
     }
 }
 
+// TestFromRaw_Errors checks that truncated or oversized raw messages are rejected.
 func TestFromRaw_Errors(t *testing.T) {
     tests := []struct {
         name  string
@@ -107,19 +110,19 @@ func TestFromRaw_Errors(t *testing.T) {
         },
         {
             name:  "truncated key size header",
-            input: []byte{0x01, 0x00, 0x00}, // 3 bytes instead of 4
+            input: []byte{0x01, 0x00, 0x00},
         },
         {
             name:  "key size exceeds buffer length",
-            input: []byte{0x0A, 0x00, 0x00, 0x00, 'a', 'b'}, // declares 10-byte key, provides 2
+            input: []byte{0x0A, 0x00, 0x00, 0x00, 'a', 'b'},
         },
         {
             name:  "truncated body size header",
-            input: []byte{0x00, 0x00, 0x00, 0x00, 0x01}, // valid 0-byte key, truncated body header
+            input: []byte{0x00, 0x00, 0x00, 0x00, 0x01},
         },
         {
             name:  "body size exceeds buffer length",
-            input: []byte{0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 'a'}, // declares 5-byte body, provides 1
+            input: []byte{0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 'a'},
         },
         {
             name:  "key size exceeds MaxSize",
@@ -141,6 +144,7 @@ func TestFromRaw_Errors(t *testing.T) {
     }
 }
 
+// TestToRaw checks the raw encoding of a message with its offset.
 func TestToRaw(t *testing.T) {
     tests := []struct {
         name string
@@ -174,6 +178,8 @@ func TestToRaw(t *testing.T) {
     }
 }
 
+// TestToSeparator checks that ToSeparator joins key and body, and that
+// FromSeparator decodes the result back.
 func TestToSeparator(t *testing.T) {
     tests := []struct {
         name string
@@ -211,6 +217,7 @@ func TestToSeparator(t *testing.T) {
     }
 }
 
+// encodeMessageWithoutOffset returns the raw producer encoding of key and body.
 func encodeMessageWithoutOffset(key, body string) []byte {
     buf := make([]byte, 0, 4+len(key)+4+len(body))
 
@@ -223,6 +230,7 @@ func encodeMessageWithoutOffset(key, body string) []byte {
     return buf
 }
 
+// encodeMessageWithOffset returns the raw consumer encoding of key and body at offset.
 func encodeMessageWithOffset(key, body string, offset uint32) []byte {
     buf := make([]byte, 0, 4+4+len(key)+4+len(body))
 
@@ -236,9 +244,11 @@ func encodeMessageWithOffset(key, body string, offset uint32) []byte {
     return buf
 }
 
+// buildTooLargeBodyInput returns a raw message header whose key and body sizes
+// add up to one byte more than MaxSize.
 func buildTooLargeBodyInput() []byte {
     keySize := uint32(100)
-    bodySize := MaxSize - keySize + 1 // Exceeds MaxSize when combined with keySize
+    bodySize := MaxSize - keySize + 1
 
     buf := make([]byte, 0, 4+int(keySize)+4)
     buf = binary.LittleEndian.AppendUint32(buf, keySize)
