@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -39,4 +40,23 @@ func main() {
 	// wait for the consumers to commit before removing the fifo
 	<-ctx.Done()
 	srv.Shutdown()
+	removeClientFifos(f.Path())
+}
+
+// removes the fifos left by the clients of this server: a killed client
+// cannot remove its own
+func removeClientFifos(serverPath string) {
+	paths, err := filepath.Glob(serverPath + ".*")
+	if err != nil {
+		return
+	}
+	for _, p := range paths {
+		fi, err := os.Lstat(p)
+		if err != nil || fi.Mode()&os.ModeNamedPipe == 0 {
+			continue
+		}
+		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Warnf("failed to remove %s: %v", p, err)
+		}
+	}
 }

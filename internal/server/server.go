@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"sync"
 
@@ -34,6 +36,10 @@ func (s *Server) Serve(fifo *fifo.Fifo) {
 	for {
 		// context.background receive acks when the server disconnects
 		p, err := packet.ReadPacket(context.Background(), fifo)
+		// main closed the fifo after Shutdown: the server is exiting
+		if errors.Is(err, os.ErrClosed) {
+			return
+		}
 		if err != nil {
 			log.Errorf("error parsing packet: %v", err)
 		}
