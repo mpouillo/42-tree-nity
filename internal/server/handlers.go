@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"syscall"
 
 	"github.com/charmbracelet/log"
 	"github.com/mpouillo/42-tree-nity/internal/consumer"
@@ -156,7 +157,11 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 		if err == nil {
 			// a returning client must not still be connected
 			if s.isConnected(previous) {
-				return nil, response.TopicError, fmt.Errorf("error subscribing consumer: %v", errDuplicateClient)
+				if syscall.Kill(previous.PID, 0) == nil {
+					return nil, response.TopicError, fmt.Errorf("error subscribing consumer: %v", errDuplicateClient)
+				}
+				// the previous client was killed without disconnecting
+				s.topics[previous.Topic].Unsubscribe(previous.ID)
 			}
 			if previous.Topic == payload.Topic {
 				offset = previous.Offset.Load()
@@ -171,6 +176,7 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 		if err != nil {
 			return nil, response.GeneralError, fmt.Errorf("error creating consumer: %v", err)
 		}
+		client.PID = payload.PID
 
 		if err := topic.Subscribe(client); err != nil {
 			_ = client.CloseIPCChannel()

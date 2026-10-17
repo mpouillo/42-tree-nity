@@ -47,6 +47,7 @@ type Subscribe struct {
 	Prefix       string
 	Offset       *uint32 `json:",omitempty"` // nil when --offset is not given
 	Raw          bool    `json:"-"`
+	PID          int     `kong:"-"` // lets the server detect a dead previous client
 }
 
 type AckOffset struct {
