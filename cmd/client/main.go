@@ -9,6 +9,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/charmbracelet/log"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
@@ -72,7 +73,8 @@ func run() int {
 		return errCode
 	}
 	commandInfo := ClientCommandInfo{serverEndpoint: serverEndpoint, cli: &cli, context: ctx,
-		responseFifo: responseFifo, responseFifoReader: responseFifoReader}
+		responseFifo: responseFifo, responseFifoReader: responseFifoReader,
+		responseReader: packet.NewReader(responseFifoReader)}
 	defer func() { _ = responseFifoReader.Close() }()
 
 	return cmd.run(commandInfo)

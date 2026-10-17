@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -57,8 +58,8 @@ func SendCommand(commandInfo *ClientCommandInfo, cmd uint8, request any) int {
 }
 
 // like ReadResponse, but also returns the command of the packet
-func ReadCommandResponse(ctx context.Context, fifo *fifo.Fifo) (uint8, *response.Response, int) {
-	pkt, err := packet.ReadPacket(ctx, fifo)
+func ReadCommandResponse(ctx context.Context, r *bufio.Reader) (uint8, *response.Response, int) {
+	pkt, err := packet.ReadPacket(ctx, r)
 	if errors.Is(err, context.Canceled) {
 		return commands.CmdNone, nil, int(response.NoError)
 	}
@@ -84,8 +85,8 @@ func ReadCommandResponse(ctx context.Context, fifo *fifo.Fifo) (uint8, *response
 	return pkt.Header.Command, &resp, int(response.NoError)
 }
 
-func ReadResponse(ctx context.Context, fifo *fifo.Fifo) (*response.Response, int) {
-	_, resp, errCode := ReadCommandResponse(ctx, fifo)
+func ReadResponse(ctx context.Context, r *bufio.Reader) (*response.Response, int) {
+	_, resp, errCode := ReadCommandResponse(ctx, r)
 	return resp, errCode
 }
 
@@ -93,7 +94,7 @@ func GetResponse(c ClientCommandInfo, stopNewConnectionsAfter bool) (*response.R
 	ctx, cancel := context.WithTimeout(c.context, responseTimeout)
 	defer cancel()
 
-	resp, code := ReadResponse(ctx, c.responseFifoReader)
+	resp, code := ReadResponse(ctx, c.responseReader)
 	if stopNewConnectionsAfter {
 		_ = c.responseFifo.Close()
 	}

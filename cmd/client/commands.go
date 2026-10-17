@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	commands "github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/packet"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 	"github.com/mpouillo/42-tree-nity/internal/structs/fifo"
 )
@@ -21,6 +23,7 @@ type ClientCommandInfo struct {
 	context            context.Context
 	responseFifo       *fifo.Fifo
 	responseFifoReader *fifo.Fifo
+	responseReader     *bufio.Reader
 }
 
 type Command struct {
@@ -144,6 +147,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	handshake := commandInfo
 	handshake.responseFifo = pidFifo
 	handshake.responseFifoReader = pidFifo
+	handshake.responseReader = packet.NewReader(pidFifo)
 	resp, errCode := dialogWithServer(handshake, commands.CmdSubscribe, request, true)
 	if resp == nil {
 		return errCode
@@ -154,7 +158,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	_ = commandInfo.responseFifo.Close()
 
 	for {
-		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, consumerFifo)
+		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, commandInfo.responseReader)
 		if resp == nil {
 			if errCode == int(response.NoError){
 				SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{IPCPath: request.ConsumerPath, Client: request.Client})
