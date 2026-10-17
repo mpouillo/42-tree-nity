@@ -14,7 +14,8 @@ type stdinMessage struct {
 	err error
 }
 
-// Read in a go routine to not block the main go routine
+// readMessages reads messages from reader in a goroutine and sends them on the
+// returned channel, stopping after the first error (io.EOF at the end).
 func readMessages(reader io.Reader, raw bool) <-chan stdinMessage {
 	stdinChannel := make(chan stdinMessage)
 
@@ -39,14 +40,14 @@ func readMessages(reader io.Reader, raw bool) <-chan stdinMessage {
 	return stdinChannel
 }
 
-// reads the next line, it skips empty lines
+// readText returns the message of the next key:body line, skipping empty lines.
+// A line without a colon is an error, like a partial raw record.
 func readText(scanner *bufio.Scanner) (*messages.Message, error) {
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
-		// like a partial raw record, a line without separator is a producer error
 		if !bytes.Contains(line, []byte(":")) {
 			return nil, fmt.Errorf("invalid message %q (expected key:body)", line)
 		}

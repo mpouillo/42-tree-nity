@@ -61,30 +61,37 @@ type Disconnect struct {
 	Client  string
 }
 
+// GetIPCPath returns the path of the FIFO on which the client waits for the answer.
 func (c CreateTopic) GetIPCPath() string {
 	return c.IPCPath
 }
 
+// GetIPCPath returns the path of the FIFO on which the client waits for the answer.
 func (c ListTopics) GetIPCPath() string {
 	return c.IPCPath
 }
 
+// GetIPCPath returns the path of the FIFO on which the client waits for the answer.
 func (c InfoClient) GetIPCPath() string {
 	return c.IPCPath
 }
 
+// GetIPCPath returns the path of the FIFO on which the client waits for the answer.
 func (c Produce) GetIPCPath() string {
 	return c.IPCPath
 }
 
+// GetIPCPath returns the path of the FIFO on which the client waits for the handshake answer.
 func (c Subscribe) GetIPCPath() string {
 	return c.IPCPath
 }
 
+// GetIPCPath returns the path of the consumer FIFO of the client.
 func (c AckOffset) GetIPCPath() string {
 	return c.IPCPath
 }
 
+// GetIPCPath returns the path of the consumer FIFO of the client.
 func (c Disconnect) GetIPCPath() string {
 	return c.IPCPath
 }

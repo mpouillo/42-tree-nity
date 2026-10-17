@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestPath checks that Path returns the path of the FIFO.
 func TestPath(t *testing.T) {
 	path := "/tmp/test.fifo"
 	f := &Fifo{path: path}
@@ -16,6 +17,8 @@ func TestPath(t *testing.T) {
 	}
 }
 
+// TestCreateFifo checks that createFifo creates a FIFO, accepts an existing one
+// and rejects any other file.
 func TestCreateFifo(t *testing.T) {
 	t.Run("check fifo created", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
@@ -68,6 +71,8 @@ func TestCreateFifo(t *testing.T) {
 	})
 }
 
+// TestCreate checks that Create opens a new or existing FIFO, owns only the
+// ones it created and cleans up after a failure.
 func TestCreate(t *testing.T) {
 	t.Run("create new fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
@@ -143,6 +148,8 @@ func TestCreate(t *testing.T) {
 	})
 }
 
+// TestOpen checks that Open opens an existing FIFO and rejects missing paths,
+// symlinks, regular files and unknown modes.
 func TestOpen(t *testing.T) {
 	t.Run("open existing fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
@@ -221,6 +228,7 @@ func TestOpen(t *testing.T) {
 	})
 }
 
+// TestRead checks reading from an open FIFO and from a closed one.
 func TestRead(t *testing.T) {
 	t.Run("read data written to fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
@@ -268,6 +276,7 @@ func TestRead(t *testing.T) {
 	})
 }
 
+// TestWrite checks writing to an open FIFO and to a closed one.
 func TestWrite(t *testing.T) {
 	t.Run("write data to fifo", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")
@@ -306,6 +315,8 @@ func TestWrite(t *testing.T) {
 	})
 }
 
+// TestClose checks that Close removes only owned FIFOs and can be called
+// several times with the same result.
 func TestClose(t *testing.T) {
 	t.Run("close removes fifo when owner", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.fifo")

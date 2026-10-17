@@ -22,10 +22,11 @@ var (
 	ErrGeneralError   = errors.New("internal server error")
 	ErrDuplicateTopic = errors.New("topic already exists")
 
-	// the handlers shadow the topic package with a local variable
+	// errDuplicateClient aliases topic.ErrDuplicateClient for handlers that shadow the topic package.
 	errDuplicateClient = topic.ErrDuplicateClient
 )
 
+// handleCommand dispatches packet p to the handler of its command.
 func (s *Server) handleCommand(ctx context.Context, p *packet.Packet) {
 	if p == nil {
 		return
@@ -51,6 +52,7 @@ func (s *Server) handleCommand(ctx context.Context, p *packet.Packet) {
 	}
 }
 
+// handleCreateTopic creates a topic and starts its goroutine, or fails if the name is taken.
 func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 	f := func(payload *commands.CreateTopic) (any, uint8, error) {
 		s.mu.Lock()
@@ -77,6 +79,7 @@ func (s *Server) handleCreateTopic(ctx context.Context, p *packet.Packet) {
 	s.executeWithResponse(p, commands.CmdCreateTopic, f)
 }
 
+// handleListTopics answers with the names of all the topics.
 func (s *Server) handleListTopics(p *packet.Packet) {
 	f := func(payload *commands.ListTopics) (any, uint8, error) {
 		s.mu.RLock()
@@ -94,6 +97,7 @@ func (s *Server) handleListTopics(p *packet.Packet) {
 	s.executeWithResponse(p, commands.CmdListTopics, f)
 }
 
+// handleInfoClient answers with the metadata stored for a client.
 func (s *Server) handleInfoClient(p *packet.Packet) {
 	f := func(payload *commands.InfoClient) (any, uint8, error) {
 		s.mu.RLock()
@@ -119,6 +123,7 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 	s.executeWithResponse(p, commands.CmdInfoClient, f)
 }
 
+// handleProduce stores a message in its topic, which delivers it to the matching consumers.
 func (s *Server) handleProduce(p *packet.Packet) {
 	f := func(payload *commands.Produce) (any, uint8, error) {
 		t, exists := s.topics[payload.Topic]
@@ -141,6 +146,8 @@ func (s *Server) handleProduce(p *packet.Packet) {
 	s.executeWithResponse(p, commands.CmdProduce, f)
 }
 
+// handleSubscribe registers a consumer, resuming from its committed offset unless
+// another is given. A dead previous client with the same name is replaced.
 func (s *Server) handleSubscribe(p *packet.Packet) {
 	f := func(payload *commands.Subscribe) (any, uint8, error) {
 		s.mu.Lock()
@@ -158,12 +165,10 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 
 		var offset uint32
 		if err == nil {
-			// a returning client must not still be connected
 			if s.isConnected(previous) {
 				if syscall.Kill(previous.PID, 0) == nil {
 					return nil, response.TopicError, fmt.Errorf("error subscribing consumer: %v", errDuplicateClient)
 				}
-				// the previous client was killed without disconnecting
 				s.topics[previous.Topic].Unsubscribe(previous.ID)
 			}
 			if previous.Topic == payload.Topic {
@@ -174,7 +179,6 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 			offset = *payload.Offset
 		}
 
-		// always a new consumer: the client comes back with a new fifo
 		client, err := consumer.NewConsumer(payload.Client, payload.Topic, payload.Prefix, offset, payload.ConsumerPath)
 		if err != nil {
 			return nil, response.GeneralError, fmt.Errorf("error creating consumer: %v", err)
@@ -199,6 +203,8 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 	s.executeWithResponse(p, commands.CmdSubscribe, f)
 }
 
+// handleAckOffset commits the offset acknowledged by a consumer and lets its
+// topic send the next message.
 func (s *Server) handleAckOffset(p *packet.Packet) {
 	f := func(payload *commands.AckOffset) (any, uint8, error) {
 		s.mu.Lock()
@@ -216,7 +222,6 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 			return nil, response.TopicError, fmt.Errorf("topic does not exist")
 		}
 
-		// commit the offset, then let the topic send the next message
 		client.Offset.Store(payload.Offset)
 		if err := topic.Ack(client); err != nil {
 			return nil, response.TopicError, err
@@ -229,6 +234,7 @@ func (s *Server) handleAckOffset(p *packet.Packet) {
 	executeWithoutResponse(p, f)
 }
 
+// handleDisconnect unsubscribes a consumer that is exiting; its metadata is kept.
 func (s *Server) handleDisconnect(p *packet.Packet) {
 	f := func(payload *commands.Disconnect) (any, uint8, error) {
 		s.mu.Lock()
@@ -254,6 +260,8 @@ func (s *Server) handleDisconnect(p *packet.Packet) {
 	executeWithoutResponse(p, f)
 }
 
+// executeWithResponse decodes the payload of p, runs f on it and writes the
+// result or the error to the response FIFO of the client.
 func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packet, cmd uint8, f func(payload *T) (any, uint8, error)) {
 	payload, err := processPacket[T](p)
 	if err != nil {
@@ -281,7 +289,8 @@ func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packe
 	}
 }
 
-// for ackoffset and disconnect, which get no response
+// executeWithoutResponse decodes the payload of p and runs f on it, logging any
+// error. It is used for the commands that get no answer (ack and disconnect).
 func executeWithoutResponse[T any](p *packet.Packet, f func(payload *T) (any, uint8, error)) {
 	payload, err := processPacket[T](p)
 	if err != nil {
@@ -294,12 +303,13 @@ func executeWithoutResponse[T any](p *packet.Packet, f func(payload *T) (any, ui
 	}
 }
 
-// reports whether the consumer is currently subscribed to its topic
+// isConnected reports whether c is currently subscribed to its topic.
 func (s *Server) isConnected(c *consumer.Consumer) bool {
 	t := s.topics[c.Topic]
 	return t != nil && t.HasConsumer(c.ID)
 }
 
+// processPacket decodes the JSON payload of p into a value of type T.
 func processPacket[T any](p *packet.Packet) (T, error) {
 	var obj T
 	if err := json.Unmarshal(p.Payload, &obj); err != nil {
@@ -308,6 +318,8 @@ func processPacket[T any](p *packet.Packet) (T, error) {
 	return obj, nil
 }
 
+// sendSuccess writes a successful cmd response carrying data to w. It does not
+// log w, whose FIFO may be closed concurrently.
 func (s *Server) sendSuccess(w io.Writer, cmd uint8, data any) error {
 	var dataBytes []byte
 	var err error
@@ -331,11 +343,11 @@ func (s *Server) sendSuccess(w io.Writer, cmd uint8, data any) error {
 		return err
 	}
 
-	// do not print w: formatting a fifo reads its fields while another goroutine may close it
 	log.Debugf("packet written: %v", r)
 	return packet.WritePacket(w, cmd, rBytes)
 }
 
+// sendError writes a cmd response with the error code and message msg to w.
 func (s *Server) sendError(w io.Writer, cmd uint8, code uint8, msg string) {
 	r := response.Response{
 		Code:     code,

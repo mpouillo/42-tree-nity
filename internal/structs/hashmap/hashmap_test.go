@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestNewHashMap checks that a new hashmap is empty with 16 buckets.
 func TestNewHashMap(t *testing.T) {
 	hm := NewHashMap[int]()
 
@@ -18,6 +19,7 @@ func TestNewHashMap(t *testing.T) {
 	}
 }
 
+// TestCap checks that cap returns the number of buckets.
 func TestCap(t *testing.T) {
 	hm := NewHashMap[uint64]()
 	if int(hm.cap()) != cap(hm.elements) {
@@ -25,6 +27,7 @@ func TestCap(t *testing.T) {
 	}
 }
 
+// TestResize checks that resize doubles the buckets and moves entries to their new index.
 func TestResize(t *testing.T) {
 	t.Run("check capacity", func(t *testing.T) {
 		hm := NewHashMap[uint64]()
@@ -70,6 +73,7 @@ func TestResize(t *testing.T) {
 	})
 }
 
+// TestInsert checks inserting, replacing a value and growing the hashmap.
 func TestInsert(t *testing.T) {
 	t.Run("check basic insert", func(t *testing.T) {
 		hm := NewHashMap[uint64]()
@@ -105,6 +109,7 @@ func TestInsert(t *testing.T) {
 	})
 }
 
+// TestGet checks that Get finds inserted keys and returns ErrKeyNotFound otherwise.
 func TestGet(t *testing.T) {
 	t.Run("check basic get", func(t *testing.T) {
 		hm := NewHashMap[uint64]()

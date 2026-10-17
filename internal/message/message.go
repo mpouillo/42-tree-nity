@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-// max size of key+body
+// MaxSize is the maximum size of key and body together, in bytes.
 const MaxSize = 1024
 
 var ErrInvalidMessage = errors.New("error parsing message from raw byte value")
@@ -24,6 +24,7 @@ type TopicMessage struct {
 	Offset uint32
 }
 
+// FromRaw decodes the single raw message held by msg.
 func FromRaw(msg []byte) (*Message, error) {
 	m, err := ReadRaw(bytes.NewReader(msg))
 	if err != nil {
@@ -32,7 +33,8 @@ func FromRaw(msg []byte) (*Message, error) {
 	return m, nil
 }
 
-// reads one message [keysize:int32][key][valuesize:int32][value]
+// ReadRaw reads one [keysize:int32][key][valuesize:int32][value] message from r.
+// It returns io.EOF only if r ends before the message starts.
 func ReadRaw(r io.Reader) (*Message, error) {
 	var size [4]byte
 
@@ -66,7 +68,7 @@ func ReadRaw(r io.Reader) (*Message, error) {
 	}, nil
 }
 
-// does the same as io.readFull but an EOF is considered an error
+// readFull is like io.ReadFull but returns io.ErrUnexpectedEOF instead of io.EOF.
 func readFull(r io.Reader, buf []byte) error {
 	_, err := io.ReadFull(r, buf)
 	if err == io.EOF {
@@ -75,6 +77,8 @@ func readFull(r io.Reader, buf []byte) error {
 	return err
 }
 
+// FromSeparator splits msg at the first sep into key and body. Without sep, the
+// whole msg is the key and the body is empty.
 func FromSeparator(msg []byte, sep string) *Message {
 	key, body, found := bytes.Cut(msg, []byte(sep))
 
@@ -91,7 +95,7 @@ func FromSeparator(msg []byte, sep string) *Message {
 	}
 }
 
-// [offset:int32][keysize:int32][key:bytes][valuesize:int32][value:bytes]
+// ToRaw encodes m as [offset:int32][keysize:int32][key][valuesize:int32][value].
 func (m *TopicMessage) ToRaw() []byte {
 	buf := make([]byte, 0, 4+4+len(m.Key)+4+len(m.Body))
 	buf = binary.LittleEndian.AppendUint32(buf, m.Offset)
@@ -102,6 +106,7 @@ func (m *TopicMessage) ToRaw() []byte {
 	return buf
 }
 
+// ToSeparator returns key, sep and body joined together.
 func (m *Message) ToSeparator(sep string) []byte {
 	buf := make([]byte, 0, len(m.Key)+len(sep)+len(m.Body))
 	buf = append(buf, m.Key...)
