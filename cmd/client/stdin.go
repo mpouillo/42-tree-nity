@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 
-	"github.com/charmbracelet/log"
 	messages "github.com/mpouillo/42-tree-nity/internal/message"
 )
 
@@ -39,16 +39,16 @@ func readMessages(reader io.Reader, raw bool) <-chan stdinMessage {
 	return stdinChannel
 }
 
-// reads the next line, it skips invalid lines
+// reads the next line, it skips empty lines
 func readText(scanner *bufio.Scanner) (*messages.Message, error) {
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
+		// like a partial raw record, a line without separator is a producer error
 		if !bytes.Contains(line, []byte(":")) {
-			log.Errorf("invalid message %q (expected key:body), skipped", line)
-			continue
+			return nil, fmt.Errorf("invalid message %q (expected key:body)", line)
 		}
 
 		msg := messages.FromSeparator(line, ":")
