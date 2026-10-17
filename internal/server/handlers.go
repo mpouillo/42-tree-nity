@@ -121,14 +121,17 @@ func (s *Server) handleInfoClient(p *packet.Packet) {
 
 func (s *Server) handleProduce(p *packet.Packet) {
 	f := func(payload *commands.Produce) (any, uint8, error) {
-		topic, exists := s.topics[payload.Topic]
+		t, exists := s.topics[payload.Topic]
 		if !exists {
 			return nil, response.TopicError, fmt.Errorf("topic does not exist")
 		}
 
-		_, err := topic.Produce(payload.Message.Key, payload.Message.Body)
+		_, err := t.Produce(payload.Message.Key, payload.Message.Body)
 		if err != nil {
-			return nil, response.GeneralError, fmt.Errorf("error producing message: %v", err)
+			if err == topic.ErrTopicClosed {
+				return nil, response.IpcError, fmt.Errorf("error producing message: %v", err)
+			}
+			return nil, response.TopicError, fmt.Errorf("error producing message: %v", err)
 		}
 
 		log.Infof("produced message: %v", payload.Message)
@@ -143,7 +146,7 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
-		topic, exists := s.topics[payload.Topic]
+		t, exists := s.topics[payload.Topic]
 		if !exists {
 			return nil, response.TopicError, fmt.Errorf("topic does not exist")
 		}
@@ -178,15 +181,18 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 		}
 		client.PID = payload.PID
 
-		if err := topic.Subscribe(client); err != nil {
+		if err := t.Subscribe(client); err != nil {
 			_ = client.CloseIPCChannel()
+			if err == topic.ErrTopicClosed {
+				return nil, response.IpcError, fmt.Errorf("error producing message: %v", err)
+			}
 			return nil, response.TopicError, fmt.Errorf("error subscribing consumer: %v", err)
 		}
 		_ = previous.CloseIPCChannel()
 
 		s.clients.Insert(client.ID, client)
 
-		log.Infof("subscribed consumer %v to topic %v", client.ID, topic.Name)
+		log.Infof("subscribed consumer %v to topic %v", client.ID, t.Name)
 		return []byte("subscription successful"), response.NoError, nil
 	}
 
