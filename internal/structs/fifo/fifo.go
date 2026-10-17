@@ -11,7 +11,7 @@ import (
 type Fifo struct {
 	path      string
 	file      *os.File
-	owner     bool      // true = we create the fifo and must remove it
+	owner     bool // true = we create the fifo and must remove it
 	closeOnce sync.Once
 	closeErr  error
 }

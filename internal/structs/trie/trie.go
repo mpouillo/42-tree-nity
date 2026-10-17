@@ -21,7 +21,7 @@ type Trie[T any] struct {
 
 // NewTrie returns an empty trie.
 func NewTrie[T any]() *Trie[T] {
-	return &Trie[T]{RootNode:NewNode[T]()}
+	return &Trie[T]{RootNode: NewNode[T]()}
 }
 
 // Insert adds value under key; several values can share the same key.
