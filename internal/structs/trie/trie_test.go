@@ -2,6 +2,7 @@ package trie
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -154,15 +155,28 @@ func TestEmptyTrieEdgeCases(t *testing.T) {
 }
 
 func TestLargeScaleTrie(t *testing.T) {
+	const size = 1000
 	trie := NewTrie[int]()
 
-	for i := 0; i < 1000; i++ {
+	for i := range size {
 		key := fmt.Sprintf("prefix.key.%d", i)
 		trie.Insert(key, i)
 	}
 
 	results := trie.Search("prefix.key.500.subaction")
-	assert.NotEmpty(t, results, "large scale search should return matching prefixes")
+	assert.ElementsMatch(t, []int{5, 50, 500}, results)
+
+	assert.Empty(t, trie.Search("other.key.500"))
+
+	for _, key := range []string{"prefix.key.999", "prefix.key.1", "prefix.key.10x", "prefix.key.", "prefix"} {
+		var want []int
+		for i := range size {
+			if strings.HasPrefix(key, fmt.Sprintf("prefix.key.%d", i)) {
+				want = append(want, i)
+			}
+		}
+		assert.ElementsMatch(t, want, trie.Search(key), "key %q", key)
+	}
 }
 
 func TestEmptyPrefixWildcard(t *testing.T) {
