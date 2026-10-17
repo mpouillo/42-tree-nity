@@ -22,7 +22,7 @@ type Consumer struct {
 	Offset atomic.Uint32 // next offset to consume
 	Fifo   *fifo.Fifo
 
-	InFlight bool      // a message is sent but not acknoleged
+	InFlight bool      // a message is sent but not acknowledged
 	SentAt   time.Time // when the in flight message was sent
 }
 

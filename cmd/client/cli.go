@@ -8,7 +8,6 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
-// regexp for valid topic and client names
 var validName = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,32}$`)
 
 type CLI struct {

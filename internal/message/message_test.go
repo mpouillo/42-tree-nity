@@ -136,7 +136,6 @@ func TestFromRaw_Errors(t *testing.T) {
             _, err := FromRaw(tt.input)
 
             assert.Error(t, err)
-            // Every error from FromRaw wraps ErrInvalidMessage
             assert.ErrorIs(t, err, ErrInvalidMessage)
         })
     }

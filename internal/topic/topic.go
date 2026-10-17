@@ -22,10 +22,10 @@ var (
 	ErrDuplicateClient = errors.New("client already exists")
 	ErrTopicClosed     = errors.New("topic is closed")
 
-	//disconnect a consumer that takes too much time to send ackoffset
+	// a consumer that does not ack within this delay is disconnected
 	ackTimeout = 3 * time.Second
 
-	// how long the server waits until he stops waiting for acks
+	// how long a shutdown waits for the last acks
 	shutdownTimeout = 5 * time.Second
 )
 
@@ -201,8 +201,7 @@ func (t *Topic) Unsubscribe(clientID string) {
 	}
 }
 
-// unsubscribe removes c only if it is still the consumer registered under its
-// ID: a stale consumer must not remove a newer one that reused the same name
+// removes c only if no newer consumer reused its name
 func (t *Topic) unsubscribe(c *consumer.Consumer) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -249,8 +248,7 @@ func (t *Topic) processAndDispatch(msg message.TopicMessage) {
 	}
 }
 
-// sendNext sends to the consumer the first message matching its prefix from
-// its committed offset, unless it is still waiting for an ack. Must only be called from run().
+// sends the next matching message if none is waiting for an ack, only from run()
 func (t *Topic) sendNext(c *consumer.Consumer) {
 	if c.InFlight {
 		return
@@ -281,8 +279,7 @@ func (t *Topic) sendNext(c *consumer.Consumer) {
 	log.Debugf("dispatched message %v to consumer %v", *next, c.ID)
 }
 
-// disconnects the consumers whose message is in flight for too long.
-// Must only be called from run().
+// disconnects the consumers that did not ack in time, only from run()
 func (t *Topic) disconnectUnacked() {
 	t.mu.RLock()
 	var expired []*consumer.Consumer
@@ -299,9 +296,7 @@ func (t *Topic) disconnectUnacked() {
 	}
 }
 
-// unsubscribes c, tells the client and closes its fifo, unless a newer
-// consumer already reused its name. The client did not choose to leave, so
-// it is an IPC error for it
+// kicks c out with an IPC error, unless a newer consumer reused its name
 func (t *Topic) disconnect(c *consumer.Consumer) {
 	if !t.unsubscribe(c) {
 		return

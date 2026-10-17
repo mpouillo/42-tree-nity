@@ -12,12 +12,11 @@ type Fifo struct {
 	path      string
 	file      *os.File
 	owner     bool      // true = we create the fifo and must remove it
-	closeOnce sync.Once // avoid closing multiple times
+	closeOnce sync.Once
 	closeErr  error
 }
 
-// Create a named FIFO at the specified path.
-// returns true if the FIFO was created, false if it already exists, and an error if any.
+// returns false if the FIFO already existed
 func createFifo(path string) (created bool, err error) {
 	err = syscall.Mkfifo(path, fifoPerms)
 	if err == nil {
@@ -38,7 +37,6 @@ func createFifo(path string) (created bool, err error) {
 	return false, nil
 }
 
-// Open opens a named FIFO at the specified path with the specified opening mode.
 func Open(path string, openmode Mode) (*Fifo, error) {
 	flags, err := openmode.flags()
 	if err != nil {
@@ -64,8 +62,7 @@ func Open(path string, openmode Mode) (*Fifo, error) {
 	return &Fifo{path: path, file: file}, nil
 }
 
-// Create creates a named FIFO at the specified path and opens it with the specified opening mode.
-// If the FIFO already existed, it is reused and will not be removed on Close.
+// an existing FIFO is reused and not removed on Close
 func Create(path string, openmode Mode) (*Fifo, error) {
 	WeCreated, err := createFifo(path)
 	if err != nil {

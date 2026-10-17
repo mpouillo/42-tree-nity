@@ -43,8 +43,7 @@ func main() {
 	removeClientFifos(f.Path())
 }
 
-// removes the fifos left by the clients of this server: a killed client
-// cannot remove its own
+// removes the fifos left by killed clients of this server
 func removeClientFifos(serverPath string) {
 	paths, err := filepath.Glob(serverPath + ".*")
 	if err != nil {
