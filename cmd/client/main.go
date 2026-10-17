@@ -13,8 +13,10 @@ import (
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
-// main runs the client and exits with the code returned by run.
+// main runs the client and exits with the code returned by run. The logger is
+// created first: it queries the terminal, which must happen before stdin is read.
 func main() {
+	log.SetDefault(log.NewWithOptions(os.Stderr, log.Options{ReportTimestamp: true}))
 	code := run()
 	log.Infof("exited with code %d", code)
 	os.Exit(code)
