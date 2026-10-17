@@ -136,6 +136,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	request := commandInfo.cli.IPC.Subscribe
 	consumerFifo := commandInfo.responseFifoReader
 	request.ConsumerPath = consumerFifo.Path()
+	request.PID = os.Getpid()
 
 	// pid fifo is used to handshake
 	pidFifo, errCode := CreateResponseFifo(pidFifoPath(commandInfo.cli.IPC.IPC))

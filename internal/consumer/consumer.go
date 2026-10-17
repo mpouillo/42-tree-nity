@@ -21,6 +21,7 @@ type Consumer struct {
 	Prefix string
 	Offset atomic.Uint32 // next offset to consume
 	Fifo   *fifo.Fifo
+	PID    int // pid of the client process
 
 	InFlight bool      // a message is sent but not acknowledged
 	SentAt   time.Time // when the in flight message was sent
