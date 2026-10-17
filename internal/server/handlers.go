@@ -325,7 +325,8 @@ func (s *Server) sendSuccess(w io.Writer, cmd uint8, data any) error {
 		return err
 	}
 
-	log.Debugf("packet written to %v: %v", w, r)
+	// do not print w: formatting a fifo reads its fields while another goroutine may close it
+	log.Debugf("packet written: %v", r)
 	return packet.WritePacket(w, cmd, rBytes)
 }
 
@@ -336,5 +337,5 @@ func (s *Server) sendError(w io.Writer, cmd uint8, code uint8, msg string) {
 	}
 	rBytes, _ := json.Marshal(r)
 	_ = packet.WritePacket(w, cmd, rBytes)
-	log.Debugf("packet written to %v: %v", w, r)
+	log.Debugf("packet written: %v", r)
 }
