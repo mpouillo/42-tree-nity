@@ -33,9 +33,10 @@ func NewServer() *Server {
 
 func (s *Server) Serve(fifo *fifo.Fifo) {
 	fmt.Printf("%s\n", fifo.Path())
+	reader := packet.NewReader(fifo)
 	for {
 		// context.background receive acks when the server disconnects
-		p, err := packet.ReadPacket(context.Background(), fifo)
+		p, err := packet.ReadPacket(context.Background(), reader)
 		// main closed the fifo after Shutdown: the server is exiting
 		if errors.Is(err, os.ErrClosed) {
 			return

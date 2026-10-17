@@ -1,6 +1,8 @@
 package packet
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -8,6 +10,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/commands"
 	"github.com/mpouillo/42-tree-nity/internal/ipc/protocol/response"
 )
 
@@ -28,7 +31,12 @@ type Packet struct {
 	Payload []byte
 }
 
-func ReadPacket(ctx context.Context, r io.Reader) (*Packet, error) {
+// create it once per fifo, it keeps the bytes it read in advance
+func NewReader(r io.Reader) *bufio.Reader {
+	return bufio.NewReaderSize(r, HeaderSize+int(MaxPayloadSize))
+}
+
+func ReadPacket(ctx context.Context, r *bufio.Reader) (*Packet, error) {
 	type result struct {
 		packet *Packet
 		err    error
@@ -37,29 +45,8 @@ func ReadPacket(ctx context.Context, r io.Reader) (*Packet, error) {
 	ch := make(chan result, 1)
 
 	go func() {
-		var header PacketHeader
-		if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-			ch <- result{nil, err}
-			return
-		}
-
-		if header.Magic != MagicByte {
-			ch <- result{nil, errors.New("invalid protocol magic byte")}
-			return
-		}
-
-		if header.PayloadLength > MaxPayloadSize {
-			ch <- result{nil, fmt.Errorf("payload length %d exceeds max allowed size %d", header.PayloadLength, MaxPayloadSize)}
-			return
-		}
-
-		payload := make([]byte, header.PayloadLength)
-		if _, err := io.ReadFull(r, payload); err != nil {
-			ch <- result{nil, err}
-			return
-		}
-
-		ch <- result{&Packet{Header: header, Payload: payload}, nil}
+		p, err := readValidPacket(r)
+		ch <- result{p, err}
 	}()
 
 	select {
@@ -68,6 +55,50 @@ func ReadPacket(ctx context.Context, r io.Reader) (*Packet, error) {
 	case res := <-ch:
 		return res.packet, res.err
 	}
+}
+
+// skips invalid bytes one by one, nothing is consumed before the whole packet is checked
+func readValidPacket(r *bufio.Reader) (*Packet, error) {
+	for {
+		raw, err := r.Peek(HeaderSize)
+		if err != nil {
+			return nil, err
+		}
+		header := PacketHeader{
+			Magic:         raw[0],
+			Command:       raw[1],
+			PayloadLength: binary.LittleEndian.Uint16(raw[2:]),
+		}
+		if !validHeader(header) {
+			_, _ = r.Discard(1)
+			continue
+		}
+
+		raw, err = r.Peek(HeaderSize + int(header.PayloadLength))
+		// the stream ended before this packet did, so it was not a real one
+		if errors.Is(err, io.EOF) {
+			_, _ = r.Discard(1)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !json.Valid(raw[HeaderSize:]) {
+			_, _ = r.Discard(1)
+			continue
+		}
+
+		// Peek returns a slice of the buffer, copy it before discarding
+		payload := bytes.Clone(raw[HeaderSize:])
+		_, _ = r.Discard(len(raw))
+		return &Packet{Header: header, Payload: payload}, nil
+	}
+}
+
+func validHeader(h PacketHeader) bool {
+	return h.Magic == MagicByte &&
+		h.Command != commands.CmdNone && h.Command <= commands.CmdDisconnect &&
+		h.PayloadLength <= MaxPayloadSize
 }
 
 func WritePacket(w io.Writer, command uint8, payload []byte) error {
