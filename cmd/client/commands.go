@@ -166,7 +166,7 @@ func cmdSubscribe(commandInfo ClientCommandInfo) int {
 	for {
 		cmd, resp, errCode := ReadCommandResponse(commandInfo.context, commandInfo.responseReader)
 		if resp == nil {
-			if errCode == int(response.NoError){
+			if errCode == int(response.NoError) {
 				SendCommand(&commandInfo, commands.CmdDisconnect, commands.Disconnect{IPCPath: request.ConsumerPath, Client: request.Client})
 			}
 			return errCode

@@ -15,8 +15,8 @@ var ErrInvalidMessage = errors.New("error parsing message from raw byte value")
 var ErrTooLarge = fmt.Errorf("message exceeds %d bytes (key+body)", MaxSize)
 
 type Message struct {
-	Key    []byte
-	Body   []byte
+	Key  []byte
+	Body []byte
 }
 
 type TopicMessage struct {
@@ -63,8 +63,8 @@ func ReadRaw(r io.Reader) (*Message, error) {
 	}
 
 	return &Message{
-		Key:    key,
-		Body:   body,
+		Key:  key,
+		Body: body,
 	}, nil
 }
 
@@ -90,8 +90,8 @@ func FromSeparator(msg []byte, sep string) *Message {
 	key = bytes.Clone(key)
 
 	return &Message{
-		Key:    key,
-		Body:   body,
+		Key:  key,
+		Body: body,
 	}
 }
 
