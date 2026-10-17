@@ -11,11 +11,11 @@ all: $(SERVER) $(CLIENT)
 
 $(SERVER):
 	@go mod tidy
-	@go build -o server ./cmd/server
+	@go build -o $(SERVER) ./cmd/server
 
 $(CLIENT):
 	@go mod tidy
-	@go build -o client ./cmd/client
+	@go build -o $(CLIENT) ./cmd/client
 
 install-go:
 	@chmod -R +w "$$HOME/go" || true
@@ -33,6 +33,18 @@ install-go:
 test:
 	@go build ./... && echo "All good!"
 	@go test ./... && echo "All good!"
+
+bubble: $(SERVER) $(CLIENT)
+	./$(SERVER) > ipc_path.tmp & \
+	sleep 1; \
+	SERVER_IPC=$$(cat ipc_path.tmp); \
+	./$(CLIENT) $$SERVER_IPC create test_topic; \
+	for i in $$(seq 1 20); do \
+		./fish ./$(CLIENT) $$SERVER_IPC test_topic & \
+	done; \
+	./aquarium ./$(CLIENT) $$SERVER_IPC test_topic test_client; \
+	rm -f ipc_path.tmp
+	pkill fish
 
 lint:
 	@golangci-lint run
