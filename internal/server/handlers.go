@@ -154,7 +154,7 @@ func (s *Server) handleSubscribe(p *packet.Packet) {
 
 		var offset uint32
 		if err == nil {
-			//the client comes back after disconnect, he must not already be connected
+			// a returning client must not still be connected
 			if s.isConnected(previous) {
 				return nil, response.TopicError, fmt.Errorf("error subscribing consumer: %v", errDuplicateClient)
 			}
@@ -243,14 +243,12 @@ func (s *Server) handleDisconnect(p *packet.Packet) {
 }
 
 func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packet, cmd uint8, f func(payload *T) (any, uint8, error)) {
-	// unmarshall packet payload
 	payload, err := processPacket[T](p)
 	if err != nil {
 		log.Errorf("error processing packet payload: %v", err)
 		return
 	}
 
-	// open response FIFO
 	outFifo, err := fifo.Open(payload.GetIPCPath(), fifo.Write)
 	if err != nil {
 		log.Warnf("error creating response fifo: %v", err)
@@ -258,10 +256,7 @@ func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packe
 	}
 	defer func() { _ = outFifo.Close() }()
 
-	// run function
 	data, code, err := f(&payload)
-
-	// handle errors
 	if err != nil {
 		e := err.Error()
 		log.Error(e)
@@ -269,13 +264,12 @@ func (s *Server) executeWithResponse[T commands.IPCPathProvider](p *packet.Packe
 		return
 	}
 
-	// handle data
 	if err := s.sendSuccess(outFifo, cmd, data); err != nil {
 		log.Errorf("error sending response: %v", err)
 	}
 }
 
-//used for client commands that does not need response (ackoffset and disconnect) 
+// for ackoffset and disconnect, which get no response
 func executeWithoutResponse[T any](p *packet.Packet, f func(payload *T) (any, uint8, error)) {
 	payload, err := processPacket[T](p)
 	if err != nil {
