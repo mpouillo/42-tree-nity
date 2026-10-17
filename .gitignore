@@ -33,4 +33,6 @@ go.work.sum
 
 client
 server
+!client/
+!server/
 gitinette
